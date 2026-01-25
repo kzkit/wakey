@@ -9,9 +9,23 @@ import SwiftUI
 
 @main
 struct MatchaApp: App {
-    var body: some Scene {
-        WindowGroup {
-            ContentView()
-        }
-    }
+	@StateObject private var viewModel = MatchaViewModel()
+	@NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
+	
+	var body: some Scene {
+		MenuBarExtra {
+			MenuContentView(viewModel: viewModel)
+		} label: {
+			Image(systemName: viewModel.isActive ? "leaf.fill" : "leaf")
+				.symbolRenderingMode(.palette)
+				.foregroundStyle(viewModel.isActive ? Color.green : Color.primary)
+		}
+		.menuBarExtraStyle(.window)
+		
+		Window("Matcha Settings", id: "settings") {
+			SettingsView(viewModel: viewModel)
+		}
+		.windowResizability(.contentSize)
+		.defaultPosition(.center)
+	}
 }
