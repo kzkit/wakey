@@ -13,42 +13,22 @@ import Combine
 final class AppMonitor: ObservableObject {
 	@Published private(set) var isActive = false
 	
+	private enum DefaultsKey {
+		static let watchedApps = "watchedApps"
+	}
+	
 	private var watchedApps: Set<String>
 	private let defaults = UserDefaults.standard
 	private var timerCancellable: AnyCancellable?
 	
 	init() {
-		watchedApps = Set(defaults.stringArray(forKey: "watchedApps") ?? [])
+		watchedApps = Set(defaults.stringArray(forKey: DefaultsKey.watchedApps) ?? [])
 		startMonitoring()
 		checkRunningApps()
 	}
 	
-	var watchedAppNames: [String] {
-		watchedApps.compactMap { bundleID in
-			NSWorkspace.shared.runningApplications
-				.first(where: { $0.bundleIdentifier == bundleID })?
-				.localizedName
-		}
-	}
-	
 	var currentWatchedApps: Set<String> {
 		watchedApps
-	}
-	
-	func addApp(_ bundleID: String) {
-		watchedApps.insert(bundleID)
-		saveWatchedApps()
-		checkRunningApps()
-	}
-	
-	func removeApp(_ bundleID: String) {
-		watchedApps.remove(bundleID)
-		saveWatchedApps()
-		checkRunningApps()
-	}
-	
-	func isWatching(_ bundleID: String) -> Bool {
-		watchedApps.contains(bundleID)
 	}
 	
 	func setWatchedApps(_ apps: Set<String>) {
@@ -97,6 +77,20 @@ final class AppMonitor: ObservableObject {
 	}
 	
 	private func saveWatchedApps() {
-		defaults.set(Array(watchedApps), forKey: "watchedApps")
+		defaults.set(Array(watchedApps), forKey: DefaultsKey.watchedApps)
+	}
+	
+	deinit {
+		NSWorkspace.shared.notificationCenter.removeObserver(
+			self,
+			name: NSWorkspace.didLaunchApplicationNotification,
+			object: nil
+		)
+		NSWorkspace.shared.notificationCenter.removeObserver(
+			self,
+			name: NSWorkspace.didTerminateApplicationNotification,
+			object: nil
+		)
+		timerCancellable?.cancel()
 	}
 }

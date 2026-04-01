@@ -54,6 +54,8 @@ final class MatchaViewModel: ObservableObject {
 	}
 	
 	func start(duration: TimerDuration) {
+		timerCancellable?.cancel()
+		timerCancellable = nil
 		manualTimerActive = true
 		remainingSeconds = duration.seconds
 		
@@ -103,4 +105,3 @@ final class MatchaViewModel: ObservableObject {
 		isActive = shouldBeActive
 	}
 }
-

@@ -12,12 +12,16 @@ import Combine
 final class ScheduleManager: ObservableObject {
 	@Published private(set) var isActive = false
 	
+	private enum DefaultsKey {
+		static let schedule = "schedule"
+	}
+	
 	private var schedule: Schedule
 	private var timerCancellable: AnyCancellable?
 	private let defaults = UserDefaults.standard
 	
 	init() {
-		if let data = defaults.data(forKey: "schedule"),
+		if let data = defaults.data(forKey: DefaultsKey.schedule),
 			 let decoded = try? JSONDecoder().decode(Schedule.self, from: data) {
 			schedule = decoded
 		} else {
@@ -35,7 +39,7 @@ final class ScheduleManager: ObservableObject {
 	func updateSchedule(_ newSchedule: Schedule) {
 		schedule = newSchedule
 		if let encoded = try? JSONEncoder().encode(schedule) {
-			defaults.set(encoded, forKey: "schedule")
+			defaults.set(encoded, forKey: DefaultsKey.schedule)
 		}
 		checkSchedule()
 	}

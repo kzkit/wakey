@@ -13,7 +13,6 @@ struct SettingsView: View {
 	
 	@State private var schedule: Schedule
 	@State private var pendingWatchedApps: Set<String>
-	@State private var showingAppPicker = false
 	
 	private let matchaGreen = Color(red: 0.4, green: 0.6, blue: 0.4)
 	
@@ -67,33 +66,19 @@ struct SettingsView: View {
 			
 			Toggle("Enable schedule", isOn: $schedule.isEnabled)
 			
-			HStack {
-				Text("Active hours:")
-				
-				Menu {
-					ForEach(0..<24, id: \.self) { hour in
-						Button(String(format: "%02d:00", hour)) {
-							schedule.startHour = hour
-						}
+				HStack {
+					Text("Active hours:")
+					
+					hourMenu(selectedHour: schedule.startHour) { selectedHour in
+						schedule.startHour = selectedHour
 					}
-				} label: {
-					Text(String(format: "%02d:00", schedule.startHour))
-						.frame(width: 50)
-				}
-				
-				Text("to")
-				
-				Menu {
-					ForEach(0..<24, id: \.self) { hour in
-						Button(String(format: "%02d:00", hour)) {
-							schedule.endHour = hour
-						}
+					
+					Text("to")
+					
+					hourMenu(selectedHour: schedule.endHour) { selectedHour in
+						schedule.endHour = selectedHour
 					}
-				} label: {
-					Text(String(format: "%02d:00", schedule.endHour))
-						.frame(width: 50)
 				}
-			}
 			
 			Label("Schedule active now", systemImage: "checkmark.circle.fill")
 				.foregroundColor(.green)
@@ -151,6 +136,19 @@ struct SettingsView: View {
 		}
 		.padding(.horizontal, 8)
 		.padding(.vertical, 4)
+	}
+	
+	private func hourMenu(selectedHour: Int, onSelect: @escaping (Int) -> Void) -> some View {
+		Menu {
+			ForEach(0..<24, id: \.self) { hour in
+				Button(String(format: "%02d:00", hour)) {
+					onSelect(hour)
+				}
+			}
+		} label: {
+			Text(String(format: "%02d:00", selectedHour))
+				.frame(width: 50)
+		}
 	}
 	
 	private var runningApps: [InstalledApp] {

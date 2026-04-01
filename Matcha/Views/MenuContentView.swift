@@ -10,6 +10,7 @@ import SwiftUI
 struct MenuContentView: View {
 	@ObservedObject var viewModel: MatchaViewModel
 	@Environment(\.openWindow) private var openWindow
+	@Environment(\.dismiss) private var dismiss
 	
 	private let matchaGreen = Color(red: 0.4, green: 0.6, blue: 0.4)
 	
@@ -25,42 +26,52 @@ struct MenuContentView: View {
 			
 			Divider()
 			
-			if viewModel.isActive {
-				if viewModel.canStop {
-					Button(action: viewModel.stop) {
-						Label("Stop", systemImage: "stop.fill")
-					}
-					.buttonStyle(.plain)
-					.foregroundColor(.red)
-				} else {
+				if viewModel.isActive {
+					if viewModel.canStop {
+						Button {
+							performAndDismissMenu(viewModel.stop)
+						} label: {
+							Label("Stop", systemImage: "stop.fill")
+						}
+						.buttonStyle(.plain)
+						.foregroundColor(.red)
+					} else {
 					Label("Stop", systemImage: "stop.fill")
 						.foregroundColor(.gray)
 				}
-			} else {
-				ForEach(TimerDuration.allCases) { duration in
-					Button { viewModel.start(duration: duration) } label: {
-						HStack(spacing: 6) {
-							Image(systemName: "timer")
-								.foregroundColor(matchaGreen)
-							Text(duration.displayName)
+				} else {
+					ForEach(TimerDuration.allCases) { duration in
+						Button {
+							performAndDismissMenu {
+								viewModel.start(duration: duration)
+							}
+						} label: {
+							HStack(spacing: 6) {
+								Image(systemName: "timer")
+									.foregroundColor(matchaGreen)
+								Text(duration.displayName)
 						}
 					}
 					.buttonStyle(.plain)
 				}
 			}
 			
-			Divider()
-			
-			Button("Settings") {
-				openSettings()
+				Divider()
+				
+				Button("Settings") {
+					performAndDismissMenu {
+						openSettings()
+					}
+				}
+				.buttonStyle(.plain)
+				
+				Button("Quit") {
+					performAndDismissMenu {
+						NSApplication.shared.terminate(nil)
+					}
+				}
+				.buttonStyle(.plain)
 			}
-			.buttonStyle(.plain)
-			
-			Button("Quit") {
-				NSApplication.shared.terminate(nil)
-			}
-			.buttonStyle(.plain)
-		}
 		.padding()
 		.frame(width: 180)
 	}
@@ -78,5 +89,10 @@ struct MenuContentView: View {
 				}
 			}
 		}
+	}
+	
+	private func performAndDismissMenu(_ action: () -> Void) {
+		action()
+		dismiss()
 	}
 }
