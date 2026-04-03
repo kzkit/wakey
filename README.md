@@ -19,32 +19,9 @@ A lightweight macOS menu bar app that keeps your Mac awake only when you need it
 |---|---|
 | ![Menu UI](docs/screenshots/menu.png) | ![Settings UI](docs/screenshots/settings.png) |
 
-| Active State |
-|---|
-| ![Active State](docs/screenshots/active-state.png) |
+## Installation
 
-## Requirements
 
-- macOS `15.7+`
-- Xcode `26.2+`
-- Swift `5`
-
-## Getting Started
-
-1. Clone the repository:
-
-   ```bash
-   git clone https://github.com/<your-username>/Matcha.git
-   cd Matcha
-   ```
-
-2. Open the project:
-
-   ```bash
-   open Matcha.xcodeproj
-   ```
-
-3. Build and run `Matcha` in Xcode.
 
 ## How It Works
 
@@ -54,18 +31,6 @@ A lightweight macOS menu bar app that keeps your Mac awake only when you need it
    - `Schedule Mode` (active hours)
    - `App Aware Mode` (bundle IDs from running apps)
 4. Matcha creates a macOS power assertion while active, then releases it when inactive.
-
-## Project Structure
-
-```text
-Matcha/
-  Models/
-  Services/
-  ViewModels/
-  Views/
-  MatchaApp.swift
-  AppDelegate.swift
-```
 
 ## License
 
@@ -81,10 +46,3 @@ Contributions are welcome.
 2. Create a branch (`codex/your-feature` or `feature/your-feature`).
 3. Commit your changes.
 4. Open a pull request.
-
-## Roadmap Ideas
-
-- Launch at login option.
-- More duration presets and custom timer input.
-- Better active-state history/insights.
-- Export/import settings.
