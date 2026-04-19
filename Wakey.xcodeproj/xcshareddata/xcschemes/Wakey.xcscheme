@@ -16,9 +16,9 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "FC8346AA2F2648D1002DB31B"
-               BuildableName = "Matcha.app"
-               BlueprintName = "Matcha"
-               ReferencedContainer = "container:Matcha.xcodeproj">
+               BuildableName = "Wakey.app"
+               BlueprintName = "Wakey"
+               ReferencedContainer = "container:Wakey.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
       </BuildActionEntries>
@@ -45,9 +45,9 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "FC8346AA2F2648D1002DB31B"
-            BuildableName = "Matcha.app"
-            BlueprintName = "Matcha"
-            ReferencedContainer = "container:Matcha.xcodeproj">
+            BuildableName = "Wakey.app"
+            BlueprintName = "Wakey"
+            ReferencedContainer = "container:Wakey.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </LaunchAction>
@@ -62,9 +62,9 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "FC8346AA2F2648D1002DB31B"
-            BuildableName = "Matcha.app"
-            BlueprintName = "Matcha"
-            ReferencedContainer = "container:Matcha.xcodeproj">
+            BuildableName = "Wakey.app"
+            BlueprintName = "Wakey"
+            ReferencedContainer = "container:Wakey.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </ProfileAction>

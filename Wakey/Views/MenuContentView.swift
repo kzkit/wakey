@@ -1,6 +1,6 @@
 //
 //  MenuContentView.swift
-//  Matcha
+//  Wakey
 //
 //  Created by Zhen Kit Kong on 25/01/2026.
 //
@@ -8,17 +8,17 @@
 import SwiftUI
 
 struct MenuContentView: View {
-	@ObservedObject var viewModel: MatchaViewModel
+	@ObservedObject var viewModel: WakeyViewModel
 	@Environment(\.openWindow) private var openWindow
 	@Environment(\.dismiss) private var dismiss
 	
-	private let matchaGreen = Color(red: 0.4, green: 0.6, blue: 0.4)
+	private let WakeyGreen = Color(red: 0.4, green: 0.6, blue: 0.4)
 	
 	var body: some View {
 		VStack(alignment: .leading, spacing: 12) {
 			HStack(spacing: 6) {
 				Image(systemName: viewModel.isActive ? "cup.and.saucer.fill" : "cup.and.saucer")
-					.foregroundColor(matchaGreen)
+					.foregroundColor(WakeyGreen)
 				Text(viewModel.statusText)
 			}
 			.font(.headline)
@@ -48,7 +48,7 @@ struct MenuContentView: View {
 						} label: {
 							HStack(spacing: 6) {
 								Image(systemName: "timer")
-									.foregroundColor(matchaGreen)
+									.foregroundColor(WakeyGreen)
 								Text(duration.displayName)
 						}
 					}
@@ -82,7 +82,7 @@ struct MenuContentView: View {
 		DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
 			for window in NSApplication.shared.windows {
 				if window.identifier?.rawValue == "settings" ||
-						window.title == "Matcha Settings" {
+						window.title == "Wakey Settings" {
 					window.orderFrontRegardless()
 					NSApp.activate(ignoringOtherApps: true)
 					break

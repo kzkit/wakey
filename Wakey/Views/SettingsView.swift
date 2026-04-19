@@ -1,6 +1,6 @@
 //
 //  SettingsView.swift
-//  Matcha
+//  Wakey
 //
 //  Created by Zhen Kit Kong on 25/01/2026.
 //
@@ -9,14 +9,14 @@ import SwiftUI
 import AppKit
 
 struct SettingsView: View {
-	@ObservedObject var viewModel: MatchaViewModel
+	@ObservedObject var viewModel: WakeyViewModel
 	
 	@State private var schedule: Schedule
 	@State private var pendingWatchedApps: Set<String>
 	
-	private let matchaGreen = Color(red: 0.4, green: 0.6, blue: 0.4)
+	private let WakeyGreen = Color(red: 0.4, green: 0.6, blue: 0.4)
 	
-	init(viewModel: MatchaViewModel) {
+	init(viewModel: WakeyViewModel) {
 		self.viewModel = viewModel
 		_schedule = State(initialValue: viewModel.scheduleManager.currentSchedule)
 		_pendingWatchedApps = State(initialValue: viewModel.appMonitor.currentWatchedApps)
@@ -43,7 +43,7 @@ struct SettingsView: View {
 					saveChanges()
 				}
 				.buttonStyle(.borderedProminent)
-				.tint(matchaGreen)
+				.tint(WakeyGreen)
 				.disabled(!hasChanges)
 			}
 			.padding(.bottom, 8)
@@ -59,7 +59,7 @@ struct SettingsView: View {
 		VStack(alignment: .leading, spacing: 12) {
 			HStack(spacing: 6) {
 				Image(systemName: "clock")
-					.foregroundColor(matchaGreen)
+					.foregroundColor(WakeyGreen)
 				Text("Schedule Mode")
 			}
 			.font(.headline)
@@ -91,7 +91,7 @@ struct SettingsView: View {
 		VStack(alignment: .leading, spacing: 12) {
 			HStack(spacing: 6) {
 				Image(systemName: "apple.intelligence")
-					.foregroundColor(matchaGreen)
+					.foregroundColor(WakeyGreen)
 				Text("App Aware Mode")
 			}
 			
@@ -132,7 +132,7 @@ struct SettingsView: View {
 				}
 			}
 			.buttonStyle(.bordered)
-			.tint(pendingWatchedApps.contains(app.bundleIdentifier) ? .red : matchaGreen)
+			.tint(pendingWatchedApps.contains(app.bundleIdentifier) ? .red : WakeyGreen)
 		}
 		.padding(.horizontal, 8)
 		.padding(.vertical, 4)

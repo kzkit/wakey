@@ -1,6 +1,6 @@
 //
 //  NotificationManager.swift
-//  Matcha
+//  Wakey
 //
 //  Created by Zhen Kit Kong on 25/01/2026.
 //
@@ -22,7 +22,7 @@ final class NotificationManager {
 	
 	func sendTimerEndedNotification() {
 		let content = UNMutableNotificationContent()
-		content.title = "Matcha"
+		content.title = "Wakey"
 		content.body = "Timer ended. Your Mac can sleep now."
 		content.sound = .default
 		

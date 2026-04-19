@@ -1,6 +1,6 @@
 //
 //  Schedule.swift
-//  Matcha
+//  Wakey
 //
 //  Created by Zhen Kit Kong on 25/01/2026.
 //

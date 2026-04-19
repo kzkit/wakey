@@ -1,6 +1,6 @@
 //
-//  MatchaViewModel.swift
-//  Matcha
+//  WakeyViewModel.swift
+//  Wakey
 //
 //  Created by Zhen Kit Kong on 25/01/2026.
 //
@@ -9,7 +9,7 @@ import Foundation
 import Combine
 
 @MainActor
-final class MatchaViewModel: ObservableObject {
+final class WakeyViewModel: ObservableObject {
 	@Published private(set) var isActive = false
 	@Published private(set) var remainingSeconds: TimeInterval?
 	

@@ -1,6 +1,6 @@
 //
-//  MatchaApp.swift
-//  Matcha
+//  WakeyApp.swift
+//  Wakey
 //
 //  Created by Zhen Kit Kong on 25/01/2026.
 //
@@ -8,8 +8,8 @@
 import SwiftUI
 
 @main
-struct MatchaApp: App {
-	@StateObject private var viewModel = MatchaViewModel()
+struct WakeyApp: App {
+	@StateObject private var viewModel = WakeyViewModel()
 	@NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
 	
 	var body: some Scene {
@@ -22,7 +22,7 @@ struct MatchaApp: App {
 		}
 		.menuBarExtraStyle(.window)
 		
-		Window("Matcha Settings", id: "settings") {
+		Window("Wakey Settings", id: "settings") {
 			SettingsView(viewModel: viewModel)
 		}
 		.windowResizability(.contentSize)

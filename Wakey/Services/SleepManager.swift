@@ -1,6 +1,6 @@
 //
 //  SleepManager.swift
-//  Matcha
+//  Wakey
 //
 //  Created by Zhen Kit Kong on 25/01/2026.
 //
@@ -13,7 +13,7 @@ final class SleepManager {
 	private(set) var isActive: Bool = false
 	
 	/// Prevents system sleep. Returns success/failure.
-	func preventSleep(reason: String = "Matcha is keeping your Mac awake") -> Bool {
+	func preventSleep(reason: String = "Wakey is keeping your Mac awake") -> Bool {
 		guard !isActive else { return true }
 		
 		let result = IOPMAssertionCreateWithName(
