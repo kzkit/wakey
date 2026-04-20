@@ -16,9 +16,9 @@ struct WakeyApp: App {
 		MenuBarExtra {
 			MenuContentView(viewModel: viewModel)
 		} label: {
-			Image(systemName: viewModel.isActive ? "leaf.fill" : "leaf")
+			Image(systemName: "bolt.fill")
 				.symbolRenderingMode(.palette)
-				.foregroundStyle(viewModel.isActive ? Color.green : Color.primary)
+				.foregroundStyle(viewModel.isActive ? Color.yellow : Color.primary)
 		}
 		.menuBarExtraStyle(.window)
 		
