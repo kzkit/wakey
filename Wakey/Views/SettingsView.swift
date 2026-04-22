@@ -167,44 +167,68 @@ struct SettingsView: View {
 	}
 	
 	private var runningApps: [InstalledApp] {
-		var apps: [String: InstalledApp] = [:]
-		
-		// Add all running apps
-		NSWorkspace.shared.runningApplications
-			.filter { $0.activationPolicy == .regular }
-			.forEach { app in
-				guard let bundleID = app.bundleIdentifier,
-							let name = app.localizedName else {
-					return
-				}
-				let icon = app.icon
-				apps[bundleID] = InstalledApp(name: name, bundleIdentifier: bundleID, icon: icon)
-			}
-		
-		// Add watched apps that aren't currently running
-		for bundleID in pendingWatchedApps where apps[bundleID] == nil {
-			if let appURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID),
-				 let bundle = Bundle(url: appURL),
-				 let name = bundle.infoDictionary?["CFBundleName"] as? String ?? bundle.infoDictionary?["CFBundleDisplayName"] as? String {
-				let icon = NSWorkspace.shared.icon(forFile: appURL.path)
-				apps[bundleID] = InstalledApp(name: name, bundleIdentifier: bundleID, icon: icon)
-			}
-		}
-		
-		return apps.values.sorted {
-			let firstInWatched = pendingWatchedApps.contains($0.bundleIdentifier)
-			let secondInWatched = pendingWatchedApps.contains($1.bundleIdentifier)
-			
-			if firstInWatched != secondInWatched {
-				return firstInWatched
-			}
-			return $0.name < $1.name
-		}
+		var apps = runningAppsByBundleIdentifier()
+		addStoppedWatchedApps(to: &apps)
+		return sortApps(apps.values)
 	}
 	
 	private var hasChanges: Bool {
 		schedule != viewModel.schedulerManager.currentSchedule ||
 		pendingWatchedApps != viewModel.appMonitor.currentWatchedApps
+	}
+
+	private func runningAppsByBundleIdentifier() -> [String: InstalledApp] {
+		var apps: [String: InstalledApp] = [:]
+
+		for app in NSWorkspace.shared.runningApplications where app.activationPolicy == .regular {
+			guard let bundleID = app.bundleIdentifier,
+						let name = app.localizedName else {
+				continue
+			}
+
+			apps[bundleID] = InstalledApp(name: name, bundleIdentifier: bundleID, icon: app.icon)
+		}
+
+		return apps
+	}
+
+	private func addStoppedWatchedApps(to apps: inout [String: InstalledApp]) {
+		for bundleID in pendingWatchedApps where apps[bundleID] == nil {
+			guard let app = installedApp(for: bundleID) else {
+				continue
+			}
+
+			apps[bundleID] = app
+		}
+	}
+
+	private func installedApp(for bundleIdentifier: String) -> InstalledApp? {
+		guard let appURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleIdentifier),
+					let bundle = Bundle(url: appURL),
+					let name = appDisplayName(from: bundle) else {
+			return nil
+		}
+
+		let icon = NSWorkspace.shared.icon(forFile: appURL.path)
+		return InstalledApp(name: name, bundleIdentifier: bundleIdentifier, icon: icon)
+	}
+
+	private func appDisplayName(from bundle: Bundle) -> String? {
+		bundle.infoDictionary?["CFBundleName"] as? String ??
+		bundle.infoDictionary?["CFBundleDisplayName"] as? String
+	}
+
+	private func sortApps(_ apps: Dictionary<String, InstalledApp>.Values) -> [InstalledApp] {
+		apps.sorted {
+			let firstInWatched = pendingWatchedApps.contains($0.bundleIdentifier)
+			let secondInWatched = pendingWatchedApps.contains($1.bundleIdentifier)
+
+			if firstInWatched != secondInWatched {
+				return firstInWatched
+			}
+
+			return $0.name < $1.name
+		}
 	}
 	
 	private func saveChanges() {

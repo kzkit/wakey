@@ -101,15 +101,16 @@ struct MenuContentView: View {
 		foregroundColor: Color? = nil,
 		action: @escaping () -> Void
 	) -> some View {
-		plainMenuButton {
+		plainMenuButton(
+			label: {
 			if let systemImage {
 				Label(title, systemImage: systemImage)
 			} else {
 				Text(title)
 			}
-		} action: {
-			action()
-		}
+		},
+			action: action
+		)
 		.foregroundColor(foregroundColor)
 	}
 	

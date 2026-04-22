@@ -13,7 +13,7 @@ final class NotificationManager {
 	private init() {}
 	
 	func requestAuthorization() {
-		UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { granted, error in
+		UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, error in
 			if let error = error {
 				print("Notification authorization error: \(error)")
 			}
@@ -35,4 +35,3 @@ final class NotificationManager {
 		UNUserNotificationCenter.current().add(request)
 	}
 }
-
