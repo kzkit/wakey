@@ -13,7 +13,7 @@ final class WakeyViewModel: ObservableObject {
 	@Published private(set) var isActive = false
 	@Published private(set) var remainingSeconds: TimeInterval?
 	
-	let scheduleManager = ScheduleManager()
+	let schedulerManager = SchedulerManager()
 	let appMonitor = AppMonitor()
 	private let sleepManager = SleepManager()
 	private var timerCancellable: AnyCancellable?
@@ -21,7 +21,7 @@ final class WakeyViewModel: ObservableObject {
 	private var manualTimerActive = false
 	
 	init() {
-		scheduleManager.$isActive
+		schedulerManager.$isActive
 			.combineLatest(appMonitor.$isActive)
 			.sink { [weak self] _, _ in
 				self?.updateSleepState()
@@ -36,43 +36,23 @@ final class WakeyViewModel: ObservableObject {
 	var statusText: String {
 		guard isActive else { return "Inactive" }
 		
-		if let remaining = remainingSeconds {
-			let mins = Int(remaining) / 60
-			let secs = Int(remaining) % 60
-			return String(format: "%d:%02d", mins, secs)
-		}
-		
-		if scheduleManager.isActive {
-			return "Active (Schedule)"
-		}
-		
-		if appMonitor.isActive {
-			return "Active (App)"
-		}
-		
-		return "Forever"
+		return remainingSeconds.map(formattedStatusTime) ?? nonTimedStatusText
 	}
 	
 	func start(duration: TimerDuration) {
-		timerCancellable?.cancel()
-		timerCancellable = nil
+		resetTimer()
 		manualTimerActive = true
 		remainingSeconds = duration.seconds
 		
 		if duration.seconds != nil {
-			timerCancellable = Timer.publish(every: 1, on: .main, in: .common)
-				.autoconnect()
-				.sink { [weak self] _ in
-					self?.tick()
-				}
+			startCountdownTimer()
 		}
 		
 		updateSleepState()
 	}
 	
 	func stop() {
-		timerCancellable?.cancel()
-		timerCancellable = nil
+		resetTimer()
 		manualTimerActive = false
 		remainingSeconds = nil
 		updateSleepState()
@@ -94,7 +74,7 @@ final class WakeyViewModel: ObservableObject {
 	}
 	
 	private func updateSleepState() {
-		let shouldBeActive = manualTimerActive || scheduleManager.isActive || appMonitor.isActive
+		let shouldBeActive = manualTimerActive || schedulerManager.isActive || appMonitor.isActive
 		
 		if shouldBeActive && !sleepManager.isActive {
 			_ = sleepManager.preventSleep()
@@ -103,5 +83,36 @@ final class WakeyViewModel: ObservableObject {
 		}
 		
 		isActive = shouldBeActive
+	}
+	
+	private var nonTimedStatusText: String {
+		if schedulerManager.isActive {
+			return "Active (Schedule)"
+		}
+		
+		if appMonitor.isActive {
+			return "Active (App)"
+		}
+		
+		return "Forever"
+	}
+	
+	private func formattedStatusTime(_ remaining: TimeInterval) -> String {
+		let mins = Int(remaining) / 60
+		let secs = Int(remaining) % 60
+		return String(format: "%d:%02d", mins, secs)
+	}
+	
+	private func startCountdownTimer() {
+		timerCancellable = Timer.publish(every: 1, on: .main, in: .common)
+			.autoconnect()
+			.sink { [weak self] _ in
+				self?.tick()
+			}
+	}
+	
+	private func resetTimer() {
+		timerCancellable?.cancel()
+		timerCancellable = nil
 	}
 }

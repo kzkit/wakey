@@ -20,6 +20,11 @@ final class AppMonitor: ObservableObject {
 	private var watchedApps: Set<String>
 	private let defaults = UserDefaults.standard
 	private var timerCancellable: AnyCancellable?
+	private let workspaceNotificationCenter = NSWorkspace.shared.notificationCenter
+	private let appActivityNotifications: [Notification.Name] = [
+		NSWorkspace.didLaunchApplicationNotification,
+		NSWorkspace.didTerminateApplicationNotification
+	]
 	
 	init() {
 		watchedApps = Set(defaults.stringArray(forKey: DefaultsKey.watchedApps) ?? [])
@@ -38,19 +43,7 @@ final class AppMonitor: ObservableObject {
 	}
 	
 	private func startMonitoring() {
-		NSWorkspace.shared.notificationCenter.addObserver(
-			self,
-			selector: #selector(appLaunched),
-			name: NSWorkspace.didLaunchApplicationNotification,
-			object: nil
-		)
-		
-		NSWorkspace.shared.notificationCenter.addObserver(
-			self,
-			selector: #selector(appTerminated),
-			name: NSWorkspace.didTerminateApplicationNotification,
-			object: nil
-		)
+		registerWorkspaceObservers()
 		
 		timerCancellable = Timer.publish(every: 5, on: .main, in: .common)
 			.autoconnect()
@@ -59,11 +52,7 @@ final class AppMonitor: ObservableObject {
 			}
 	}
 	
-	@objc private func appLaunched(_ notification: Notification) {
-		checkRunningApps()
-	}
-	
-	@objc private func appTerminated(_ notification: Notification) {
+	@objc private func appActivityChanged(_ notification: Notification) {
 		checkRunningApps()
 	}
 	
@@ -80,17 +69,25 @@ final class AppMonitor: ObservableObject {
 		defaults.set(Array(watchedApps), forKey: DefaultsKey.watchedApps)
 	}
 	
+	private func registerWorkspaceObservers() {
+		for notification in appActivityNotifications {
+			workspaceNotificationCenter.addObserver(
+				self,
+				selector: #selector(appActivityChanged),
+				name: notification,
+				object: nil
+			)
+		}
+	}
+	
 	deinit {
-		NSWorkspace.shared.notificationCenter.removeObserver(
-			self,
-			name: NSWorkspace.didLaunchApplicationNotification,
-			object: nil
-		)
-		NSWorkspace.shared.notificationCenter.removeObserver(
-			self,
-			name: NSWorkspace.didTerminateApplicationNotification,
-			object: nil
-		)
+		for notification in appActivityNotifications {
+			NSWorkspace.shared.notificationCenter.removeObserver(
+				self,
+				name: notification,
+				object: nil
+			)
+		}
 		timerCancellable?.cancel()
 	}
 }

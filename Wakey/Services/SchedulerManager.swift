@@ -9,7 +9,7 @@ import Foundation
 import Combine
 
 @MainActor
-final class ScheduleManager: ObservableObject {
+final class SchedulerManager: ObservableObject {
 	@Published private(set) var isActive = false
 	
 	private enum DefaultsKey {
@@ -21,12 +21,7 @@ final class ScheduleManager: ObservableObject {
 	private let defaults = UserDefaults.standard
 	
 	init() {
-		if let data = defaults.data(forKey: DefaultsKey.schedule),
-			 let decoded = try? JSONDecoder().decode(Schedule.self, from: data) {
-			schedule = decoded
-		} else {
-			schedule = .default
-		}
+		schedule = Self.loadSchedule(from: defaults)
 		
 		checkSchedule()
 		startMonitoring()
@@ -38,9 +33,7 @@ final class ScheduleManager: ObservableObject {
 	
 	func updateSchedule(_ newSchedule: Schedule) {
 		schedule = newSchedule
-		if let encoded = try? JSONEncoder().encode(schedule) {
-			defaults.set(encoded, forKey: DefaultsKey.schedule)
-		}
+		saveSchedule(schedule)
 		checkSchedule()
 	}
 	
@@ -54,5 +47,22 @@ final class ScheduleManager: ObservableObject {
 	
 	private func checkSchedule() {
 		isActive = schedule.isWithinSchedule()
+	}
+	
+	private static func loadSchedule(from defaults: UserDefaults) -> Schedule {
+		guard let data = defaults.data(forKey: DefaultsKey.schedule),
+				let decoded = try? JSONDecoder().decode(Schedule.self, from: data) else {
+			return .default
+		}
+		
+		return decoded
+	}
+	
+	private func saveSchedule(_ schedule: Schedule) {
+		guard let encoded = try? JSONEncoder().encode(schedule) else {
+			return
+		}
+		
+		defaults.set(encoded, forKey: DefaultsKey.schedule)
 	}
 }

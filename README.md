@@ -1,8 +1,8 @@
-# Matcha
+# Wakey
 
 A lightweight macOS menu bar app that keeps your Mac awake only when you need it.
 
-`Matcha` combines quick timers, scheduled hours, and app-aware triggers so your Mac stays active for focused work, meetings, downloads, or demos without leaving sleep prevention on forever.
+`Wakey` combines quick timers, scheduled hours, and app-aware triggers so your Mac stays active for focused work, meetings, downloads, or demos without leaving sleep prevention on forever.
 
 ## Highlights
 
@@ -30,7 +30,7 @@ A lightweight macOS menu bar app that keeps your Mac awake only when you need it
 3. Open `Settings` to configure:
    - `Schedule Mode` (active hours)
    - `App Aware Mode` (bundle IDs from running apps)
-4. Matcha creates a macOS power assertion while active, then releases it when inactive.
+4. Wakey creates a macOS power assertion while active, then releases it when inactive.
 
 ## License
 
