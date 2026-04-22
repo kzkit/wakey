@@ -22,10 +22,8 @@ struct WakeyApp: App {
 		}
 		.menuBarExtraStyle(.window)
 		
-		Window("Wakey Settings", id: "settings") {
+		Settings {
 			SettingsView(viewModel: viewModel)
 		}
-		.windowResizability(.contentSize)
-		.defaultPosition(.center)
 	}
 }

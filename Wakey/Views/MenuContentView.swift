@@ -9,7 +9,6 @@ import SwiftUI
 
 struct MenuContentView: View {
 	@ObservedObject var viewModel: WakeyViewModel
-	@Environment(\.openWindow) private var openWindow
 	@Environment(\.dismiss) private var dismiss
 	
 	private let wakeyGreen = Color(red: 0.4, green: 0.6, blue: 0.4)
@@ -22,7 +21,7 @@ struct MenuContentView: View {
 			controlsSection
 			
 			Divider()
-			plainMenuButton(title: "Settings", action: openSettings)
+			settingsMenuItem
 			plainMenuButton(title: "Quit") {
 				NSApplication.shared.terminate(nil)
 			}
@@ -79,19 +78,21 @@ struct MenuContentView: View {
 		}
 	}
 	
-	private func openSettings() {
-		openWindow(id: "settings")
-		
-		DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-			for window in NSApplication.shared.windows {
-				if window.identifier?.rawValue == "settings" ||
-						window.title == "Wakey Settings" {
-					window.orderFrontRegardless()
-					NSApp.activate(ignoringOtherApps: true)
-					break
+	private var settingsMenuItem: some View {
+		SettingsLink {
+			Text("Settings")
+				.frame(maxWidth: .infinity, alignment: .leading)
+				.contentShape(Rectangle())
+		}
+		.buttonStyle(.plain)
+		.simultaneousGesture(
+			TapGesture().onEnded {
+				dismiss()
+				DispatchQueue.main.async {
+					SettingsWindowCoordinator.shared.raiseRegisteredWindowIfNeeded()
 				}
 			}
-		}
+		)
 	}
 	
 	private func plainMenuButton(

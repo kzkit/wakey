@@ -51,7 +51,7 @@ final class SchedulerManager: ObservableObject {
 	
 	private static func loadSchedule(from defaults: UserDefaults) -> Schedule {
 		guard let data = defaults.data(forKey: DefaultsKey.schedule),
-				let decoded = try? JSONDecoder().decode(Schedule.self, from: data) else {
+					let decoded = try? JSONDecoder().decode(Schedule.self, from: data) else {
 			return .default
 		}
 		

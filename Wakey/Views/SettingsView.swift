@@ -41,6 +41,7 @@ struct SettingsView: View {
 		}
 		.padding(20)
 		.frame(width: 400, height: 500)
+		.background(SettingsWindowAccessor())
 		.onAppear {
 			resetToSavedValues()
 		}
@@ -222,4 +223,26 @@ struct InstalledApp {
 	let name: String
 	let bundleIdentifier: String
 	let icon: NSImage?
+}
+
+private struct SettingsWindowAccessor: NSViewRepresentable {
+	func makeNSView(context: Context) -> NSView {
+		let view = NSView()
+		registerWindow(from: view)
+		return view
+	}
+	
+	func updateNSView(_ nsView: NSView, context: Context) {
+		registerWindow(from: nsView)
+	}
+	
+	private func registerWindow(from view: NSView) {
+		DispatchQueue.main.async {
+			guard let window = view.window else {
+				return
+			}
+			
+			SettingsWindowCoordinator.shared.register(window: window)
+		}
+	}
 }
