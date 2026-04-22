@@ -5,84 +5,130 @@
 //  Created by Zhen Kit Kong on 25/01/2026.
 //
 
+import AppKit
 import SwiftUI
 
 struct MenuContentView: View {
 	@ObservedObject var viewModel: WakeyViewModel
 	@Environment(\.dismiss) private var dismiss
 	
-	private let wakeyGreen = Color(red: 0.4, green: 0.6, blue: 0.4)
+	private let primaryColor = Color.blue
+	private let sectionBackground = Color(nsColor: .controlBackgroundColor)
 	
 	var body: some View {
-		VStack(alignment: .leading, spacing: 12) {
-			statusRow
-			
-			Divider()
+		VStack(alignment: .leading, spacing: 14) {
+			statusSection
 			controlsSection
-			
-			Divider()
-			settingsMenuItem
-			plainMenuButton(title: "Quit") {
-				NSApplication.shared.terminate(nil)
+			secondaryActionsSection
+		}
+		.padding(14)
+		.frame(width: 280)
+	}
+	
+	private var statusSection: some View {
+		VStack(alignment: .leading, spacing: 8) {
+			HStack(alignment: .top, spacing: 10) {
+				VStack(alignment: .leading, spacing: 2) {
+					Text("Wakey")
+						.font(.headline)
+					Text(statusTitle)
+						.font(.subheadline.weight(.medium))
+					if let detail = statusDetail {
+						Text(detail)
+							.font(.caption)
+							.foregroundStyle(.secondary)
+							.lineLimit(2)
+							.multilineTextAlignment(.leading)
+							.fixedSize(horizontal: false, vertical: true)
+					}
+				}
+				.layoutPriority(1)
+				
+				Spacer(minLength: 8)
+				
+				Image(systemName: "bolt.fill")
+					.font(.title3)
+					.foregroundStyle(viewModel.isActive ? primaryColor : .secondary)
+					.frame(width: 24, alignment: .trailing)
 			}
 		}
-		.padding()
-		.frame(width: 180)
+		.padding(12)
+		.frame(maxWidth: .infinity, alignment: .leading)
+		.background(
+			RoundedRectangle(cornerRadius: 12, style: .continuous)
+				.fill(sectionBackground)
+		)
 	}
 	
-	private var statusRow: some View {
-		HStack(spacing: 6) {
-			Image(systemName: viewModel.isActive ? "cup.and.saucer.fill" : "cup.and.saucer")
-				.foregroundColor(wakeyGreen)
-			Text(viewModel.statusText)
-		}
-		.font(.headline)
-		.padding(.bottom, 4)
-	}
-	
-	@ViewBuilder
 	private var controlsSection: some View {
-		if viewModel.isActive {
-			activeControl
-		} else {
-			timerControls
+		VStack(alignment: .leading, spacing: 6) {
+			Text(viewModel.isActive ? "Current Session" : "Quick Start")
+				.font(.caption.weight(.semibold))
+				.foregroundStyle(.secondary)
+				.padding(.horizontal, 4)
+			
+			VStack(spacing: 4) {
+				if viewModel.isActive {
+					activeControl
+				} else {
+					timerControls
+				}
+			}
 		}
 	}
 	
 	@ViewBuilder
 	private var activeControl: some View {
 		if viewModel.canStop {
-			plainMenuButton(
+			menuRowButton(
 				title: "Stop",
 				systemImage: "stop.fill",
-				foregroundColor: .red,
+				tint: .red,
 				action: viewModel.stop
 			)
 		} else {
-			Label("Stop", systemImage: "stop.fill")
-				.foregroundColor(.gray)
+			menuRowLabel(
+				title: "Managed by schedule or app rules",
+				systemImage: "clock.arrow.circlepath"
+			)
+			.fixedSize(horizontal: false, vertical: true)
+			.foregroundStyle(.secondary)
 		}
 	}
 	
 	private var timerControls: some View {
-		ForEach(TimerDuration.allCases) { duration in
-			plainMenuButton {
-				HStack(spacing: 6) {
-					Image(systemName: "timer")
-						.foregroundColor(wakeyGreen)
-					Text(duration.displayName)
+		VStack(spacing: 4) {
+			ForEach(TimerDuration.allCases) { duration in
+				menuRowButton(
+					title: duration.displayName,
+					systemImage: duration == .forever ? "infinity" : "timer",
+					action: {
+						viewModel.start(duration: duration)
+					}
+				)
+			}
+		}
+	}
+	
+	private var secondaryActionsSection: some View {
+		VStack(alignment: .leading, spacing: 6) {
+			Text("More")
+				.font(.caption.weight(.semibold))
+				.foregroundStyle(.secondary)
+				.padding(.horizontal, 4)
+			
+			VStack(spacing: 2) {
+				settingsMenuItem
+				secondaryMenuButton(title: "Quit", systemImage: "power") {
+					NSApplication.shared.terminate(nil)
 				}
-			} action: {
-				viewModel.start(duration: duration)
 			}
 		}
 	}
 	
 	private var settingsMenuItem: some View {
 		SettingsLink {
-			Text("Settings")
-				.frame(maxWidth: .infinity, alignment: .leading)
-				.contentShape(Rectangle())
+			secondaryMenuRow(title: "Settings", systemImage: "gearshape")
 		}
 		.buttonStyle(.plain)
 		.simultaneousGesture(
@@ -95,35 +141,91 @@ struct MenuContentView: View {
 		)
 	}
 	
-	private func plainMenuButton(
-		title: String,
-		systemImage: String? = nil,
-		foregroundColor: Color? = nil,
-		action: @escaping () -> Void
-	) -> some View {
-		plainMenuButton(
-			label: {
-			if let systemImage {
-				Label(title, systemImage: systemImage)
-			} else {
-				Text(title)
-			}
-		},
-			action: action
-		)
-		.foregroundColor(foregroundColor)
+	private var statusTitle: String {
+		guard viewModel.isActive else {
+			return "Inactive"
+		}
+		
+		if viewModel.canStop {
+			return "Manual session running"
+		}
+		
+		return "Sleep prevention active"
 	}
 	
-	private func plainMenuButton<LabelContent: View>(
-		@ViewBuilder label: () -> LabelContent,
+	private var statusDetail: String? {
+		guard viewModel.isActive else {
+			return "Choose a duration to keep your Mac awake."
+		}
+		
+		return viewModel.statusText
+	}
+	
+	private func menuRowButton(
+		title: String,
+		systemImage: String,
+		tint: Color? = nil,
 		action: @escaping () -> Void
 	) -> some View {
 		Button {
 			performAndDismissMenu(action)
 		} label: {
-			label()
+			menuRowLabel(title: title, systemImage: systemImage, tint: tint)
+				.fixedSize(horizontal: false, vertical: true)
 		}
 		.buttonStyle(.plain)
+	}
+	
+	private func menuRowLabel(
+		title: String,
+		systemImage: String,
+		tint: Color? = nil
+	) -> some View {
+		HStack(spacing: 10) {
+			Image(systemName: systemImage)
+				.frame(width: 14)
+				.foregroundStyle(tint ?? primaryColor)
+			Text(title)
+				.font(.body)
+				.lineLimit(nil)
+				.frame(maxWidth: .infinity, alignment: .leading)
+		}
+		.padding(.horizontal, 10)
+		.padding(.vertical, 8)
+		.frame(maxWidth: .infinity, alignment: .leading)
+		.background(
+			RoundedRectangle(cornerRadius: 10, style: .continuous)
+				.fill(sectionBackground)
+		)
+		.contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+	}
+	
+	private func secondaryMenuButton(
+		title: String,
+		systemImage: String,
+		action: @escaping () -> Void
+	) -> some View {
+		Button {
+			performAndDismissMenu(action)
+		} label: {
+			secondaryMenuRow(title: title, systemImage: systemImage)
+		}
+		.buttonStyle(.plain)
+	}
+	
+	private func secondaryMenuRow(title: String, systemImage: String) -> some View {
+		HStack(spacing: 10) {
+			Image(systemName: systemImage)
+				.frame(width: 14)
+				.foregroundStyle(.secondary)
+			Text(title)
+				.font(.callout)
+			Spacer(minLength: 0)
+		}
+		.padding(.horizontal, 10)
+		.padding(.vertical, 7)
+		.frame(maxWidth: .infinity, alignment: .leading)
+		.contentShape(Rectangle())
 	}
 	
 	private func performAndDismissMenu(_ action: () -> Void) {

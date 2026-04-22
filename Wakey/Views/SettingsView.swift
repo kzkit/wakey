@@ -5,38 +5,29 @@
 //  Created by Zhen Kit Kong on 25/01/2026.
 //
 
-import SwiftUI
 import AppKit
+import SwiftUI
 
 struct SettingsView: View {
 	@ObservedObject var viewModel: WakeyViewModel
-	
+
 	@State private var schedule: Schedule
 	@State private var pendingWatchedApps: Set<String>
-	
+
 	private let wakeyGreen = Color(red: 0.4, green: 0.6, blue: 0.4)
-	
+	private let sectionBackground = Color(nsColor: .controlBackgroundColor)
+
 	init(viewModel: WakeyViewModel) {
 		self.viewModel = viewModel
 		_schedule = State(initialValue: viewModel.schedulerManager.currentSchedule)
 		_pendingWatchedApps = State(initialValue: viewModel.appMonitor.currentWatchedApps)
 	}
-	
+
 	var body: some View {
-		VStack(alignment: .leading, spacing: 8) {
-			Text("Settings")
-				.font(.title2)
-				.bold()
-				.padding(.top, 8)
-			
-			Divider()
-			
+		VStack(alignment: .leading, spacing: 18) {
+			header
 			scheduleSection
-			Divider()
 			appSection
-			
-			Spacer()
-			
 			saveButtonRow
 		}
 		.padding(20)
@@ -46,67 +37,120 @@ struct SettingsView: View {
 			resetToSavedValues()
 		}
 	}
-	
-	private var scheduleSection: some View {
-		VStack(alignment: .leading, spacing: 12) {
-			sectionHeader(icon: "clock", title: "Schedule Mode")
-			
-			Toggle("Enable schedule", isOn: $schedule.isEnabled)
-			
-			activeHoursRow
-			
-			Label("Schedule active now", systemImage: "checkmark.circle.fill")
-				.foregroundColor(.green)
-				.font(.caption)
-				.opacity(viewModel.schedulerManager.isActive ? 1 : 0)
+
+	private var header: some View {
+		VStack(alignment: .leading, spacing: 4) {
+			Text("Settings")
+				.font(.title2.weight(.semibold))
+			Text("Choose when Wakey should keep your Mac awake.")
+				.font(.subheadline)
+				.foregroundStyle(.secondary)
 		}
+		.padding(.top, 4)
 	}
-	
+
+	private var scheduleSection: some View {
+		VStack(alignment: .leading, spacing: 14) {
+			sectionHeader(
+				icon: "clock",
+				title: "Schedule",
+				description: "Automatically keep your Mac awake during a time window."
+			)
+
+			Toggle("Enable schedule", isOn: $schedule.isEnabled)
+
+			if schedule.isEnabled {
+				activeHoursRow
+			}
+
+			if viewModel.schedulerManager.isActive {
+				Label("Schedule active now", systemImage: "checkmark.circle.fill")
+					.foregroundStyle(.green)
+					.font(.caption)
+			}
+		}
+		.padding(16)
+		.frame(maxWidth: .infinity, alignment: .leading)
+		.background(sectionCard)
+	}
+
 	private var appSection: some View {
-		VStack(alignment: .leading, spacing: 12) {
-			sectionHeader(icon: "apple.intelligence", title: "App Aware Mode")
-			
-			Text("Select from running apps. Open an app first if you don't see it here.")
+		VStack(alignment: .leading, spacing: 14) {
+			sectionHeader(
+				icon: "app.connected.to.app.below.fill",
+				title: "Watched Apps",
+				description: "Select apps that should keep your Mac awake while they are open."
+			)
+
+			Text("Running apps appear automatically. Watched apps stay listed even when they are closed.")
 				.font(.caption)
-				.foregroundColor(.secondary)
-			
+				.foregroundStyle(.secondary)
+
 			ScrollView {
-				VStack(spacing: 8) {
-					ForEach(runningApps, id: \.bundleIdentifier) { app in
-						appRow(app)
+				VStack(alignment: .leading, spacing: 14) {
+					if !watchedApps.isEmpty {
+						appGroup(title: "Watching", apps: watchedApps)
+					}
+
+					appGroup(
+						title: watchedApps.isEmpty ? "Available Apps" : "Available While Open",
+						apps: availableApps
+					)
+
+					if runningApps.isEmpty {
+						Text("Open an app to add it here.")
+							.font(.caption)
+							.foregroundStyle(.secondary)
+							.padding(.top, 4)
 					}
 				}
+				.padding(.vertical, 2)
 			}
-			.frame(height: 200)
-			.border(Color.gray.opacity(0.2))
+			.frame(maxHeight: .infinity)
 		}
+		.padding(16)
+		.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+		.background(sectionCard)
 	}
-	
+
 	private func appRow(_ app: InstalledApp) -> some View {
 		let isWatched = pendingWatchedApps.contains(app.bundleIdentifier)
-		
-		return HStack {
-			if let icon = app.icon {
-				Image(nsImage: icon)
-					.resizable()
-					.frame(width: 24, height: 24)
-			}
-			
-			Text(app.name)
-				.font(.body)
-			
-			Spacer()
-			
-			Button(isWatched ? "Remove" : "Add") {
+
+		return Button {
+			withAnimation(.easeInOut(duration: 0.15)) {
 				toggleWatchedApp(bundleIdentifier: app.bundleIdentifier, isWatched: isWatched)
 			}
-			.buttonStyle(.bordered)
-			.tint(isWatched ? .red : wakeyGreen)
+		} label: {
+			HStack(spacing: 12) {
+				if let icon = app.icon {
+					Image(nsImage: icon)
+						.resizable()
+						.frame(width: 24, height: 24)
+						.clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
+				}
+
+				Text(app.name)
+					.font(.body)
+					.foregroundStyle(.primary)
+
+				Spacer()
+
+				Image(systemName: isWatched ? "checkmark.circle.fill" : "circle")
+					.font(.system(size: 16, weight: .semibold))
+					.foregroundStyle(isWatched ? wakeyGreen : .secondary)
+			}
+			.padding(.horizontal, 12)
+			.padding(.vertical, 9)
+			.frame(maxWidth: .infinity, alignment: .leading)
+			.background(
+				RoundedRectangle(cornerRadius: 10, style: .continuous)
+					.fill(isWatched ? wakeyGreen.opacity(0.12) : Color.clear)
+			)
+			.contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
 		}
-		.padding(.horizontal, 8)
-		.padding(.vertical, 4)
+		.buttonStyle(.plain)
 	}
-	
+
 	private var saveButtonRow: some View {
 		HStack {
 			Spacer()
@@ -117,34 +161,45 @@ struct SettingsView: View {
 			.tint(wakeyGreen)
 			.disabled(!hasChanges)
 		}
-		.padding(.bottom, 8)
+		.padding(.top, 2)
 	}
-	
+
 	private var activeHoursRow: some View {
-		HStack {
-			Text("Active hours:")
-			
-			hourMenu(selectedHour: schedule.startHour) { selectedHour in
-				schedule.startHour = selectedHour
-			}
-			
-			Text("to")
-			
-			hourMenu(selectedHour: schedule.endHour) { selectedHour in
-				schedule.endHour = selectedHour
+		VStack(alignment: .leading, spacing: 8) {
+			Text("Active hours")
+				.font(.caption.weight(.semibold))
+				.foregroundStyle(.secondary)
+
+			HStack(spacing: 10) {
+				hourMenu(selectedHour: schedule.startHour) { selectedHour in
+					schedule.startHour = selectedHour
+				}
+
+				Text("to")
+					.foregroundStyle(.secondary)
+
+				hourMenu(selectedHour: schedule.endHour) { selectedHour in
+					schedule.endHour = selectedHour
+				}
 			}
 		}
 	}
-	
-	private func sectionHeader(icon: String, title: String) -> some View {
-		HStack(spacing: 6) {
-			Image(systemName: icon)
-				.foregroundColor(wakeyGreen)
-			Text(title)
+
+	private func sectionHeader(icon: String, title: String, description: String) -> some View {
+		VStack(alignment: .leading, spacing: 4) {
+			HStack(spacing: 8) {
+				Image(systemName: icon)
+					.foregroundStyle(wakeyGreen)
+				Text(title)
+			}
+			.font(.headline)
+
+			Text(description)
+				.font(.subheadline)
+				.foregroundStyle(.secondary)
 		}
-		.font(.headline)
 	}
-	
+
 	private func toggleWatchedApp(bundleIdentifier: String, isWatched: Bool) {
 		if isWatched {
 			pendingWatchedApps.remove(bundleIdentifier)
@@ -152,7 +207,7 @@ struct SettingsView: View {
 			pendingWatchedApps.insert(bundleIdentifier)
 		}
 	}
-	
+
 	private func hourMenu(selectedHour: Int, onSelect: @escaping (Int) -> Void) -> some View {
 		Menu {
 			ForEach(0..<24, id: \.self) { hour in
@@ -161,20 +216,63 @@ struct SettingsView: View {
 				}
 			}
 		} label: {
-			Text(String(format: "%02d:00", selectedHour))
-				.frame(width: 50)
+			HStack(spacing: 6) {
+				Text(String(format: "%02d:00", selectedHour))
+				Image(systemName: "chevron.up.chevron.down")
+					.font(.caption2)
+					.foregroundStyle(.secondary)
+			}
+			.padding(.horizontal, 10)
+			.padding(.vertical, 6)
+			.background(
+				RoundedRectangle(cornerRadius: 8, style: .continuous)
+					.fill(sectionBackground)
+			)
 		}
+		.menuStyle(.borderlessButton)
 	}
-	
+
 	private var runningApps: [InstalledApp] {
 		var apps = runningAppsByBundleIdentifier()
 		addStoppedWatchedApps(to: &apps)
 		return sortApps(apps.values)
 	}
-	
+
+	private var watchedApps: [InstalledApp] {
+		runningApps.filter { pendingWatchedApps.contains($0.bundleIdentifier) }
+	}
+
+	private var availableApps: [InstalledApp] {
+		runningApps.filter { !pendingWatchedApps.contains($0.bundleIdentifier) }
+	}
+
 	private var hasChanges: Bool {
 		schedule != viewModel.schedulerManager.currentSchedule ||
 		pendingWatchedApps != viewModel.appMonitor.currentWatchedApps
+	}
+
+	private var sectionCard: some View {
+		RoundedRectangle(cornerRadius: 14, style: .continuous)
+			.fill(sectionBackground)
+	}
+
+	private func appGroup(title: String, apps: [InstalledApp]) -> some View {
+		VStack(alignment: .leading, spacing: 8) {
+			Text(title)
+				.font(.caption.weight(.semibold))
+				.foregroundStyle(.secondary)
+
+			if apps.isEmpty {
+				Text("No apps in this section.")
+					.font(.caption)
+					.foregroundStyle(.secondary)
+					.padding(.vertical, 4)
+			} else {
+				ForEach(apps, id: \.bundleIdentifier) { app in
+					appRow(app)
+				}
+			}
+		}
 	}
 
 	private func runningAppsByBundleIdentifier() -> [String: InstalledApp] {
@@ -182,7 +280,7 @@ struct SettingsView: View {
 
 		for app in NSWorkspace.shared.runningApplications where app.activationPolicy == .regular {
 			guard let bundleID = app.bundleIdentifier,
-						let name = app.localizedName else {
+				let name = app.localizedName else {
 				continue
 			}
 
@@ -204,8 +302,8 @@ struct SettingsView: View {
 
 	private func installedApp(for bundleIdentifier: String) -> InstalledApp? {
 		guard let appURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleIdentifier),
-					let bundle = Bundle(url: appURL),
-					let name = appDisplayName(from: bundle) else {
+			let bundle = Bundle(url: appURL),
+			let name = appDisplayName(from: bundle) else {
 			return nil
 		}
 
@@ -230,13 +328,13 @@ struct SettingsView: View {
 			return $0.name < $1.name
 		}
 	}
-	
+
 	private func saveChanges() {
 		viewModel.schedulerManager.updateSchedule(schedule)
 		viewModel.appMonitor.setWatchedApps(pendingWatchedApps)
 		viewModel.refreshState()
 	}
-	
+
 	private func resetToSavedValues() {
 		schedule = viewModel.schedulerManager.currentSchedule
 		pendingWatchedApps = viewModel.appMonitor.currentWatchedApps
@@ -255,17 +353,17 @@ private struct SettingsWindowAccessor: NSViewRepresentable {
 		registerWindow(from: view)
 		return view
 	}
-	
+
 	func updateNSView(_ nsView: NSView, context: Context) {
 		registerWindow(from: nsView)
 	}
-	
+
 	private func registerWindow(from view: NSView) {
 		DispatchQueue.main.async {
 			guard let window = view.window else {
 				return
 			}
-			
+
 			SettingsWindowCoordinator.shared.register(window: window)
 		}
 	}
