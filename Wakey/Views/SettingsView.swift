@@ -14,7 +14,7 @@ struct SettingsView: View {
 	@State private var schedule: Schedule
 	@State private var pendingWatchedApps: Set<String>
 
-	private let wakeyGreen = Color(red: 0.4, green: 0.6, blue: 0.4)
+	private let wakeyColor = Color.blue
 	private let sectionBackground = Color(nsColor: .controlBackgroundColor)
 
 	init(viewModel: WakeyViewModel) {
@@ -137,14 +137,14 @@ struct SettingsView: View {
 
 				Image(systemName: isWatched ? "checkmark.circle.fill" : "circle")
 					.font(.system(size: 16, weight: .semibold))
-					.foregroundStyle(isWatched ? wakeyGreen : .secondary)
+					.foregroundStyle(isWatched ? wakeyColor : .secondary)
 			}
 			.padding(.horizontal, 12)
 			.padding(.vertical, 9)
 			.frame(maxWidth: .infinity, alignment: .leading)
 			.background(
 				RoundedRectangle(cornerRadius: 10, style: .continuous)
-					.fill(isWatched ? wakeyGreen.opacity(0.12) : Color.clear)
+					.fill(isWatched ? wakeyColor.opacity(0.12) : Color.clear)
 			)
 			.contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
 		}
@@ -158,7 +158,7 @@ struct SettingsView: View {
 				saveChanges()
 			}
 			.buttonStyle(.borderedProminent)
-			.tint(wakeyGreen)
+			.tint(wakeyColor)
 			.disabled(!hasChanges)
 		}
 		.padding(.top, 2)
@@ -189,7 +189,7 @@ struct SettingsView: View {
 		VStack(alignment: .leading, spacing: 4) {
 			HStack(spacing: 8) {
 				Image(systemName: icon)
-					.foregroundStyle(wakeyGreen)
+					.foregroundStyle(wakeyColor)
 				Text(title)
 			}
 			.font(.headline)

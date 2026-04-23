@@ -31,8 +31,8 @@ struct MenuContentView: View {
 				VStack(alignment: .leading, spacing: 2) {
 					Text("Wakey")
 						.font(.headline)
-					Text(statusTitle)
-						.font(.subheadline.weight(.medium))
+//					Text(statusTitle)
+//						.font(.subheadline.weight(.medium))
 					if let detail = statusDetail {
 						Text(detail)
 							.font(.caption)
@@ -48,7 +48,7 @@ struct MenuContentView: View {
 				
 				Image(systemName: "bolt.fill")
 					.font(.title3)
-					.foregroundStyle(viewModel.isActive ? primaryColor : .secondary)
+					.foregroundStyle(viewModel.isActive ? Color.yellow : .secondary)
 					.frame(width: 24, alignment: .trailing)
 			}
 		}

@@ -91,7 +91,7 @@ final class WakeyViewModel: ObservableObject {
 		}
 		
 		if appMonitor.isActive {
-			return "Active (App)"
+			return "Active (App running)"
 		}
 		
 		return "Forever"
