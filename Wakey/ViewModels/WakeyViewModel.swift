@@ -87,11 +87,11 @@ final class WakeyViewModel: ObservableObject {
 	
 	private var nonTimedStatusText: String {
 		if schedulerManager.isActive {
-			return "Active (Schedule)"
+			return "Scheduled run"
 		}
 		
 		if appMonitor.isActive {
-			return "Active (App running)"
+			return "App running"
 		}
 		
 		return "Forever"

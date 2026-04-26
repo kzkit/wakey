@@ -12,109 +12,130 @@ struct MenuContentView: View {
 	@ObservedObject var viewModel: WakeyViewModel
 	@Environment(\.dismiss) private var dismiss
 	
-	private let primaryColor = Color.blue
+	private let accentColor = Color.blue
 	
 	var body: some View {
-		VStack(alignment: .leading, spacing: 14) {
+		VStack(alignment: .leading, spacing: 0) {
+			header
 			statusSection
-			controlsSection
-			secondaryActionsSection
+				.padding(.top, 10)
+			
+			Divider()
+				.padding(.horizontal, 16)
+				.padding(.vertical, 8)
+			
+			if viewModel.isActive {
+				if viewModel.canStop {
+					activeControl
+					
+					Divider()
+						.padding(.horizontal, 16)
+						.padding(.vertical, 8)
+				}
+			} else {
+				timerSection
+				
+				Divider()
+					.padding(.horizontal, 16)
+					.padding(.vertical, 8)
+			}
+			
+			footerSection
 		}
-		.padding(12)
+		.padding(.vertical, 14)
 		.frame(width: 300)
+		.background(.regularMaterial)
+	}
+	
+	private var header: some View {
+		HStack(alignment: .center, spacing: 12) {
+			Text("Wakey")
+				.font(.system(size: 14, weight: .bold))
+				.foregroundStyle(.primary)
+		}
+		.padding(.horizontal, 16)
 	}
 	
 	private var statusSection: some View {
-		VStack(alignment: .leading, spacing: 6) {
-			HStack(alignment: .top, spacing: 10) {
-				VStack(alignment: .leading, spacing: 6) {
-					Text("Wakey")
-						.font(.headline)
-					if let detail = statusDetail {
-						Text(detail)
-							.font(.body)
-							.foregroundStyle(.primary)
-							.lineLimit(2)
-							.multilineTextAlignment(.leading)
-							.fixedSize(horizontal: false, vertical: true)
-					}
-				}
-				.layoutPriority(1)
-				
-				Image(systemName: "bolt.fill")
-					.font(.title3)
-					.foregroundStyle(viewModel.isActive ? Color.yellow : .secondary)
-					.frame(width: 24, alignment: .trailing)
-			}
+		VStack(alignment: .leading, spacing: 8) {
+			NativeMenuRow(
+				title: statusTitle,
+				detail: statusDetail,
+				systemImage: viewModel.isActive ? "bolt.fill" : "moon.zzz.fill",
+				tint: viewModel.isActive ? .yellow : .secondary
+			)
 		}
-		.frame(maxWidth: .infinity, alignment: .leading)
 	}
 	
-	private var controlsSection: some View {
-		VStack(alignment: .leading, spacing: 6) {
-			Text(viewModel.isActive ? "Current Session" : "Quick Start")
-				.font(.body)
-				.foregroundStyle(.primary)
+	private var timerSection: some View {
+		VStack(alignment: .leading, spacing: 8) {
+			sectionTitle("Quick Start")
 			
-			VStack(spacing: 4) {
-				if viewModel.isActive {
-					activeControl
-				} else {
-					timerControls
-				}
-			}
+			timerControls
 		}
 	}
 	
 	@ViewBuilder
 	private var activeControl: some View {
 		if viewModel.canStop {
-			menuRowButton(
+			NativeMenuRowButton(
 				title: "Stop",
+				detail: "Allow your Mac to sleep normally.",
 				systemImage: "stop.fill",
 				tint: .red,
-				action: viewModel.stop
+				action: {
+					performAndDismissMenu(viewModel.stop)
+				}
 			)
 		} else {
-			menuRowLabel(
-				title: "Managed by schedule or app rules",
-				systemImage: "clock.arrow.circlepath"
-			)
-			.fixedSize(horizontal: false, vertical: true)
-			.foregroundStyle(.primary)
+			EmptyView()
 		}
 	}
 	
 	private var timerControls: some View {
-		VStack(spacing: 4) {
+		VStack(spacing: 2) {
 			ForEach(TimerDuration.allCases) { duration in
-				menuRowButton(
+				NativeMenuRowButton(
 					title: duration.displayName,
+					detail: timerDetail(for: duration),
 					systemImage: duration == .forever ? "infinity" : "timer",
+					tint: .primary,
 					action: {
-						viewModel.start(duration: duration)
+						performAndDismissMenu {
+							viewModel.start(duration: duration)
+						}
 					}
 				)
 			}
 		}
 	}
 	
-	private var secondaryActionsSection: some View {
-		VStack(alignment: .leading, spacing: 8) {
-			Text("More")
-				.font(.body)
-				.foregroundStyle(.primary)
-			
+	private var footerSection: some View {
+		VStack(spacing: 2) {
 			settingsMenuItem
-			secondaryMenuButton(title: "Quit", systemImage: "power") {
-				NSApplication.shared.terminate(nil)
-			}
+			
+			NativeMenuRowButton(
+				title: "Quit",
+				detail: nil,
+				systemImage: "power",
+				tint: .primary,
+				action: {
+					performAndDismissMenu {
+						NSApplication.shared.terminate(nil)
+					}
+				}
+			)
 		}
 	}
 	
 	private var settingsMenuItem: some View {
 		SettingsLink {
-			secondaryMenuRow(title: "Settings", systemImage: "gearshape")
+			NativeMenuRow(
+				title: "Settings",
+				detail: nil,
+				systemImage: "gearshape.fill",
+				tint: .primary
+			)
 		}
 		.buttonStyle(.plain)
 		.simultaneousGesture(
@@ -136,7 +157,7 @@ struct MenuContentView: View {
 			return "Manual session running"
 		}
 		
-		return "Sleep prevention active"
+		return "Keeping Mac awake"
 	}
 	
 	private var statusDetail: String? {
@@ -147,66 +168,110 @@ struct MenuContentView: View {
 		return viewModel.statusText
 	}
 	
-	private func menuRowButton(
-		title: String,
-		systemImage: String,
-		tint: Color? = nil,
-		action: @escaping () -> Void
-	) -> some View {
-		Button {
-			performAndDismissMenu(action)
-		} label: {
-			menuRowLabel(title: title, systemImage: systemImage, tint: tint)
-				.fixedSize(horizontal: false, vertical: true)
-		}
-		.buttonStyle(.plain)
+	private func sectionTitle(_ title: String) -> some View {
+		Text(title)
+			.font(.system(size: 13, weight: .semibold))
+			.foregroundStyle(.primary)
+			.padding(.horizontal, 16)
 	}
 	
-	private func menuRowLabel(
-		title: String,
-		systemImage: String,
-		tint: Color? = nil
-	) -> some View {
-		HStack(spacing: 10) {
-			Image(systemName: systemImage)
-				.frame(width: 14)
-				.foregroundStyle(tint ?? primaryColor)
-			Text(title)
-				.font(.body)
-				.lineLimit(nil)
-				.frame(maxWidth: .infinity, alignment: .leading)
-		}
-		.frame(maxWidth: .infinity, alignment: .leading)
-	}
-	
-	private func secondaryMenuButton(
-		title: String,
-		systemImage: String,
-		action: @escaping () -> Void
-	) -> some View {
-		Button {
-			performAndDismissMenu(action)
-		} label: {
-			secondaryMenuRow(title: title, systemImage: systemImage)
-		}
-		.buttonStyle(.plain)
-	}
-	
-	private func secondaryMenuRow(title: String, systemImage: String) -> some View {
-		HStack(spacing: 10) {
-			Image(systemName: systemImage)
-				.frame(width: 14)
-				.foregroundStyle(.primary)
-			Text(title)
-				.font(.body)
-			Spacer(minLength: 0)
-		}
-		.frame(maxWidth: .infinity, alignment: .leading)
-		.contentShape(Rectangle())
+	private func timerDetail(for duration: TimerDuration) -> String? {
+		duration == .forever ? "Until you stop it." : nil
 	}
 	
 	private func performAndDismissMenu(_ action: () -> Void) {
 		action()
 		dismiss()
+	}
+}
+
+private struct NativeMenuRowButton: View {
+	let title: String
+	let detail: String?
+	let systemImage: String
+	let tint: Color
+	let action: () -> Void
+	
+	var body: some View {
+		Button(action: action) {
+			NativeMenuRow(
+				title: title,
+				detail: detail,
+				systemImage: systemImage,
+				tint: tint
+			)
+		}
+		.buttonStyle(NativeRowButtonStyle())
+	}
+}
+
+private struct NativeMenuRow: View {
+	let title: String
+	let detail: String?
+	let systemImage: String
+	let tint: Color
+	
+	var body: some View {
+		HStack(spacing: 12) {
+			Image(systemName: systemImage)
+				.font(.system(size: 12, weight: .bold))
+				.foregroundStyle(tint)
+				.symbolRenderingMode(.hierarchical)
+				.frame(width: 24, height: 24)
+			
+			VStack(alignment: .leading, spacing: 2) {
+				Text(title)
+					.font(.system(size: 14))
+					.foregroundStyle(.primary)
+					.lineLimit(1)
+				
+				if let detail {
+					Text(detail)
+						.font(.system(size: 12))
+						.foregroundStyle(.secondary)
+						.lineLimit(2)
+				}
+			}
+			.fixedSize(horizontal: false, vertical: true)
+			.layoutPriority(1)
+			
+			Spacer(minLength: 0)
+		}
+		.padding(.horizontal, 16)
+		.padding(.vertical, 5)
+		.frame(maxWidth: .infinity, alignment: .leading)
+		.contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+	}
+}
+
+private struct NativeRowButtonStyle: ButtonStyle {
+	func makeBody(configuration: Configuration) -> some View {
+		NativeRowButtonBody(configuration: configuration)
+	}
+	
+	private struct NativeRowButtonBody: View {
+		let configuration: Configuration
+		@State private var isHovered = false
+		
+		var body: some View {
+			configuration.label
+				.background(
+					RoundedRectangle(cornerRadius: 12, style: .continuous)
+						.fill(backgroundColor)
+						.padding(.horizontal, 8)
+				)
+				.scaleEffect(configuration.isPressed ? 0.985 : 1)
+				.animation(.snappy(duration: 0.14), value: configuration.isPressed)
+				.animation(.easeInOut(duration: 0.12), value: isHovered)
+				.onHover { isHovered = $0 }
+		}
+		
+		private var backgroundColor: Color {
+			if configuration.isPressed {
+				return Color.primary.opacity(0.12)
+			}
+			
+			return isHovered ? Color.primary.opacity(0.08) : .clear
+		}
 	}
 }
