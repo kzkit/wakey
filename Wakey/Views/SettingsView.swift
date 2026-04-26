@@ -15,7 +15,6 @@ struct SettingsView: View {
 	@State private var pendingWatchedApps: Set<String>
 
 	private let wakeyColor = Color.blue
-	private let sectionBackground = Color(nsColor: .controlBackgroundColor)
 
 	init(viewModel: WakeyViewModel) {
 		self.viewModel = viewModel
@@ -69,22 +68,16 @@ struct SettingsView: View {
 					.font(.caption)
 			}
 		}
-		.padding(16)
 		.frame(maxWidth: .infinity, alignment: .leading)
-		.background(sectionCard)
 	}
 
 	private var appSection: some View {
 		VStack(alignment: .leading, spacing: 14) {
 			sectionHeader(
-				icon: "app.connected.to.app.below.fill",
+				icon: "bolt.badge.automatic.fill",
 				title: "Watched Apps",
-				description: "Select apps that should keep your Mac awake while they are open."
+				description: "Select apps that should keep your Mac awake while they are open. Running apps appear automatically"
 			)
-
-			Text("Running apps appear automatically. Watched apps stay listed even when they are closed.")
-				.font(.caption)
-				.foregroundStyle(.secondary)
 
 			ScrollView {
 				VStack(alignment: .leading, spacing: 14) {
@@ -104,13 +97,14 @@ struct SettingsView: View {
 							.padding(.top, 4)
 					}
 				}
-				.padding(.vertical, 2)
+				.padding(8)
 			}
 			.frame(maxHeight: .infinity)
+			.overlay(
+				RoundedRectangle(cornerRadius: 8)
+					.stroke(Color.gray.opacity(0.3), lineWidth: 1))
 		}
-		.padding(16)
 		.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-		.background(sectionCard)
 	}
 
 	private func appRow(_ app: InstalledApp) -> some View {
@@ -139,8 +133,8 @@ struct SettingsView: View {
 					.font(.system(size: 16, weight: .semibold))
 					.foregroundStyle(isWatched ? wakeyColor : .secondary)
 			}
-			.padding(.horizontal, 12)
-			.padding(.vertical, 9)
+			.padding(.horizontal, 6)
+			.padding(.vertical, 4)
 			.frame(maxWidth: .infinity, alignment: .leading)
 			.background(
 				RoundedRectangle(cornerRadius: 10, style: .continuous)
@@ -222,12 +216,8 @@ struct SettingsView: View {
 					.font(.caption2)
 					.foregroundStyle(.secondary)
 			}
-			.padding(.horizontal, 10)
+			.padding(.horizontal, 6)
 			.padding(.vertical, 6)
-			.background(
-				RoundedRectangle(cornerRadius: 8, style: .continuous)
-					.fill(sectionBackground)
-			)
 		}
 		.menuStyle(.borderlessButton)
 	}
@@ -249,11 +239,6 @@ struct SettingsView: View {
 	private var hasChanges: Bool {
 		schedule != viewModel.schedulerManager.currentSchedule ||
 		pendingWatchedApps != viewModel.appMonitor.currentWatchedApps
-	}
-
-	private var sectionCard: some View {
-		RoundedRectangle(cornerRadius: 14, style: .continuous)
-			.fill(sectionBackground)
 	}
 
 	private func appGroup(title: String, apps: [InstalledApp]) -> some View {

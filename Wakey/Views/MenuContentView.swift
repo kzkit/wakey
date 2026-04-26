@@ -13,7 +13,6 @@ struct MenuContentView: View {
 	@Environment(\.dismiss) private var dismiss
 	
 	private let primaryColor = Color.blue
-	private let sectionBackground = Color(nsColor: .controlBackgroundColor)
 	
 	var body: some View {
 		VStack(alignment: .leading, spacing: 14) {
@@ -21,22 +20,20 @@ struct MenuContentView: View {
 			controlsSection
 			secondaryActionsSection
 		}
-		.padding(14)
-		.frame(width: 280)
+		.padding(12)
+		.frame(width: 300)
 	}
 	
 	private var statusSection: some View {
-		VStack(alignment: .leading, spacing: 8) {
+		VStack(alignment: .leading, spacing: 6) {
 			HStack(alignment: .top, spacing: 10) {
-				VStack(alignment: .leading, spacing: 2) {
+				VStack(alignment: .leading, spacing: 6) {
 					Text("Wakey")
 						.font(.headline)
-//					Text(statusTitle)
-//						.font(.subheadline.weight(.medium))
 					if let detail = statusDetail {
 						Text(detail)
-							.font(.caption)
-							.foregroundStyle(.secondary)
+							.font(.body)
+							.foregroundStyle(.primary)
 							.lineLimit(2)
 							.multilineTextAlignment(.leading)
 							.fixedSize(horizontal: false, vertical: true)
@@ -44,28 +41,20 @@ struct MenuContentView: View {
 				}
 				.layoutPriority(1)
 				
-				Spacer(minLength: 8)
-				
 				Image(systemName: "bolt.fill")
 					.font(.title3)
 					.foregroundStyle(viewModel.isActive ? Color.yellow : .secondary)
 					.frame(width: 24, alignment: .trailing)
 			}
 		}
-		.padding(12)
 		.frame(maxWidth: .infinity, alignment: .leading)
-		.background(
-			RoundedRectangle(cornerRadius: 12, style: .continuous)
-				.fill(sectionBackground)
-		)
 	}
 	
 	private var controlsSection: some View {
 		VStack(alignment: .leading, spacing: 6) {
 			Text(viewModel.isActive ? "Current Session" : "Quick Start")
-				.font(.caption.weight(.semibold))
-				.foregroundStyle(.secondary)
-				.padding(.horizontal, 4)
+				.font(.body)
+				.foregroundStyle(.primary)
 			
 			VStack(spacing: 4) {
 				if viewModel.isActive {
@@ -92,7 +81,7 @@ struct MenuContentView: View {
 				systemImage: "clock.arrow.circlepath"
 			)
 			.fixedSize(horizontal: false, vertical: true)
-			.foregroundStyle(.secondary)
+			.foregroundStyle(.primary)
 		}
 	}
 	
@@ -111,17 +100,14 @@ struct MenuContentView: View {
 	}
 	
 	private var secondaryActionsSection: some View {
-		VStack(alignment: .leading, spacing: 6) {
+		VStack(alignment: .leading, spacing: 8) {
 			Text("More")
-				.font(.caption.weight(.semibold))
-				.foregroundStyle(.secondary)
-				.padding(.horizontal, 4)
+				.font(.body)
+				.foregroundStyle(.primary)
 			
-			VStack(spacing: 2) {
-				settingsMenuItem
-				secondaryMenuButton(title: "Quit", systemImage: "power") {
-					NSApplication.shared.terminate(nil)
-				}
+			settingsMenuItem
+			secondaryMenuButton(title: "Quit", systemImage: "power") {
+				NSApplication.shared.terminate(nil)
 			}
 		}
 	}
@@ -190,14 +176,7 @@ struct MenuContentView: View {
 				.lineLimit(nil)
 				.frame(maxWidth: .infinity, alignment: .leading)
 		}
-		.padding(.horizontal, 10)
-		.padding(.vertical, 8)
 		.frame(maxWidth: .infinity, alignment: .leading)
-		.background(
-			RoundedRectangle(cornerRadius: 10, style: .continuous)
-				.fill(sectionBackground)
-		)
-		.contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
 	}
 	
 	private func secondaryMenuButton(
@@ -217,13 +196,11 @@ struct MenuContentView: View {
 		HStack(spacing: 10) {
 			Image(systemName: systemImage)
 				.frame(width: 14)
-				.foregroundStyle(.secondary)
+				.foregroundStyle(.primary)
 			Text(title)
-				.font(.callout)
+				.font(.body)
 			Spacer(minLength: 0)
 		}
-		.padding(.horizontal, 10)
-		.padding(.vertical, 7)
 		.frame(maxWidth: .infinity, alignment: .leading)
 		.contentShape(Rectangle())
 	}
