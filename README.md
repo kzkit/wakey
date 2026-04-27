@@ -8,28 +8,20 @@ Wakey is a lightweight macOS menu bar app for keeping your Mac awake without lea
 - Use quick timers for `1 minute`, `5 minutes`, `10 minutes`, or `Forever`.
 - Keep your Mac awake during scheduled hours.
 - Automatically stay awake while selected apps are running.
-- Show a native notification when a manual timer ends.
-
-## Screenshots
-
-| Menu | Settings |
-| --- | --- |
-| ![Menu UI](docs/screenshots/menu.png) | ![Settings UI](docs/screenshots/settings.png) |
 
 ## Run Locally
 
-1. Open `Wakey.xcodeproj` in Xcode.
-2. Build and run the app on macOS using Xcode.
+Download the latest version from the [releases](https://github.com/kzkit/wakey/releases/latest) page, or use [Homebrew](https://brew.sh/):
+
+```sh
+brew install maccy
+```
 
 ## Usage
 
 1. Open Wakey from the menu bar.
 2. Choose a quick timer or keep-awake mode.
 3. Use Settings to configure scheduled hours or app-aware triggers.
-
-## Contributing
-
-Contributions are welcome. Open an issue or submit a pull request if you want to improve the app.
 
 ## License
 
