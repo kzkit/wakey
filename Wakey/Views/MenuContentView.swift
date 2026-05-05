@@ -10,6 +10,7 @@ import SwiftUI
 
 struct MenuContentView: View {
 	@ObservedObject var viewModel: WakeyViewModel
+	@ObservedObject private var softwareUpdateManager = SoftwareUpdateManager.shared
 	@Environment(\.dismiss) private var dismiss
 	
 	var body: some View {
@@ -125,6 +126,18 @@ struct MenuContentView: View {
 					}
 				}
 			)
+			
+			if softwareUpdateManager.isUpdateAvailable {
+				FooterMenuRowButton(
+					title: "Update",
+					action: {
+						dismiss()
+						DispatchQueue.main.async {
+							softwareUpdateManager.showUpdate()
+						}
+					}
+				)
+			}
 			
 			FooterMenuRowButton(
 				title: "Quit",
