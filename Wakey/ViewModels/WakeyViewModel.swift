@@ -40,11 +40,13 @@ final class WakeyViewModel: ObservableObject {
 	}
 	
 	func start(duration: TimerDuration) {
+		let seconds = duration.seconds
+
 		resetTimer()
 		manualTimerActive = true
-		remainingSeconds = duration.seconds
+		remainingSeconds = seconds
 		
-		if duration.seconds != nil {
+		if seconds != nil {
 			startCountdownTimer()
 		}
 		

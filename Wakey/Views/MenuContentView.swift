@@ -12,32 +12,22 @@ struct MenuContentView: View {
 	@ObservedObject var viewModel: WakeyViewModel
 	@Environment(\.dismiss) private var dismiss
 	
-	private let accentColor = Color.blue
-	
 	var body: some View {
 		VStack(alignment: .leading, spacing: 0) {
 			header
 			statusSection
 				.padding(.top, 10)
 			
-			Divider()
-				.padding(.horizontal, 16)
-				.padding(.vertical, 8)
+			menuDivider
 			
 			if viewModel.isActive {
 				if viewModel.canStop {
 					activeControl
-					
-					Divider()
-						.padding(.horizontal, 16)
-						.padding(.vertical, 8)
+					menuDivider
 				}
 			} else {
 				timerSection
-				
-				Divider()
-					.padding(.horizontal, 16)
-					.padding(.vertical, 8)
+				menuDivider
 			}
 			
 			footerSection
@@ -56,6 +46,12 @@ struct MenuContentView: View {
 		.padding(.horizontal, 16)
 	}
 	
+	private var menuDivider: some View {
+		Divider()
+			.padding(.horizontal, 16)
+			.padding(.vertical, 8)
+	}
+
 	private var statusSection: some View {
 		VStack(alignment: .leading, spacing: 8) {
 			NativeMenuRow(
@@ -75,21 +71,16 @@ struct MenuContentView: View {
 		}
 	}
 	
-	@ViewBuilder
 	private var activeControl: some View {
-		if viewModel.canStop {
-			NativeMenuRowButton(
-				title: "Stop",
-				detail: "Allow your Mac to sleep normally.",
-				systemImage: "stop.fill",
-				tint: .red,
-				action: {
-					performAndDismissMenu(viewModel.stop)
-				}
-			)
-		} else {
-			EmptyView()
-		}
+		NativeMenuRowButton(
+			title: "Stop",
+			detail: "Allow your Mac to sleep normally.",
+			systemImage: "stop.fill",
+			tint: .red,
+			action: {
+				performAndDismissMenu(viewModel.stop)
+			}
+		)
 	}
 	
 	private var timerControls: some View {
@@ -112,7 +103,23 @@ struct MenuContentView: View {
 	
 	private var footerSection: some View {
 		VStack(spacing: 2) {
-			settingsMenuItem
+			SettingsLink {
+				NativeMenuRow(
+					title: "Settings",
+					detail: nil,
+					systemImage: "gearshape.fill",
+					tint: .primary
+				)
+			}
+			.buttonStyle(NativeRowButtonStyle())
+			.simultaneousGesture(
+				TapGesture().onEnded {
+					dismiss()
+					DispatchQueue.main.async {
+						SettingsWindowCoordinator.shared.raiseRegisteredWindowIfNeeded()
+					}
+				}
+			)
 			
 			NativeMenuRowButton(
 				title: "Quit",
@@ -126,26 +133,6 @@ struct MenuContentView: View {
 				}
 			)
 		}
-	}
-	
-	private var settingsMenuItem: some View {
-		SettingsLink {
-			NativeMenuRow(
-				title: "Settings",
-				detail: nil,
-				systemImage: "gearshape.fill",
-				tint: .primary
-			)
-		}
-		.buttonStyle(NativeRowButtonStyle())
-		.simultaneousGesture(
-			TapGesture().onEnded {
-				dismiss()
-				DispatchQueue.main.async {
-					SettingsWindowCoordinator.shared.raiseRegisteredWindowIfNeeded()
-				}
-			}
-		)
 	}
 	
 	private var statusTitle: String {

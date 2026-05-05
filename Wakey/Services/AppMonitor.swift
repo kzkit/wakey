@@ -82,7 +82,7 @@ final class AppMonitor: ObservableObject {
 	
 	deinit {
 		for notification in appActivityNotifications {
-			NSWorkspace.shared.notificationCenter.removeObserver(
+			workspaceNotificationCenter.removeObserver(
 				self,
 				name: notification,
 				object: nil

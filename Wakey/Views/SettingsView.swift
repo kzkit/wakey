@@ -168,7 +168,9 @@ struct SettingsView: View {
 	}
 	
 	private var appSection: some View {
-		VStack(alignment: .leading, spacing: 10) {
+		let appSections = categorizedApps
+
+		return VStack(alignment: .leading, spacing: 10) {
 			sectionHeader(
 				icon: "bolt.badge.automatic.fill",
 				title: "Watched Apps",
@@ -176,20 +178,20 @@ struct SettingsView: View {
 			)
 			
 			SettingsGroup {
-				if runningApps.isEmpty {
+				if appSections.isEmpty {
 					emptyAppsRow
 				} else {
-					if !watchedApps.isEmpty {
-						appGroup(title: "Watching", apps: watchedApps)
+					if !appSections.watched.isEmpty {
+						appGroup(title: "Watching", apps: appSections.watched)
 					}
 					
-					if !watchedApps.isEmpty && !availableApps.isEmpty {
+					if !appSections.watched.isEmpty && !appSections.available.isEmpty {
 						SettingsDivider()
 					}
 					
 					appGroup(
-						title: watchedApps.isEmpty ? "Available Apps" : "Available While Open",
-						apps: availableApps
+						title: appSections.watched.isEmpty ? "Available Apps" : "Available While Open",
+						apps: appSections.available
 					)
 				}
 			}
@@ -304,18 +306,16 @@ struct SettingsView: View {
 		.menuStyle(.borderlessButton)
 	}
 	
-	private var runningApps: [InstalledApp] {
+	private var categorizedApps: (watched: [InstalledApp], available: [InstalledApp], isEmpty: Bool) {
 		var apps = runningAppsByBundleIdentifier()
 		addStoppedWatchedApps(to: &apps)
-		return sortApps(apps.values)
-	}
-	
-	private var watchedApps: [InstalledApp] {
-		runningApps.filter { pendingWatchedApps.contains($0.bundleIdentifier) }
-	}
-	
-	private var availableApps: [InstalledApp] {
-		runningApps.filter { !pendingWatchedApps.contains($0.bundleIdentifier) }
+		let sortedApps = sortApps(apps.values)
+
+		return (
+			watched: sortedApps.filter { pendingWatchedApps.contains($0.bundleIdentifier) },
+			available: sortedApps.filter { !pendingWatchedApps.contains($0.bundleIdentifier) },
+			isEmpty: sortedApps.isEmpty
+		)
 	}
 	
 	private var hasChanges: Bool {
