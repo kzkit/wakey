@@ -104,12 +104,7 @@ struct MenuContentView: View {
 	private var footerSection: some View {
 		VStack(spacing: 2) {
 			SettingsLink {
-				NativeMenuRow(
-					title: "Settings",
-					detail: nil,
-					systemImage: "gearshape.fill",
-					tint: .primary
-				)
+				FooterMenuRow(title: "Settings")
 			}
 			.buttonStyle(NativeRowButtonStyle())
 			.simultaneousGesture(
@@ -121,11 +116,18 @@ struct MenuContentView: View {
 				}
 			)
 			
-			NativeMenuRowButton(
+			FooterMenuRowButton(
+				title: "About",
+				action: {
+					dismiss()
+					DispatchQueue.main.async {
+						AboutWindowCoordinator.shared.openAboutWindow()
+					}
+				}
+			)
+			
+			FooterMenuRowButton(
 				title: "Quit",
-				detail: nil,
-				systemImage: "power",
-				tint: .primary,
 				action: {
 					performAndDismissMenu {
 						NSApplication.shared.terminate(nil)
@@ -169,6 +171,33 @@ struct MenuContentView: View {
 	private func performAndDismissMenu(_ action: () -> Void) {
 		action()
 		dismiss()
+	}
+}
+
+private struct FooterMenuRowButton: View {
+	let title: String
+	let action: () -> Void
+	
+	var body: some View {
+		Button(action: action) {
+			FooterMenuRow(title: title)
+		}
+		.buttonStyle(NativeRowButtonStyle())
+	}
+}
+
+private struct FooterMenuRow: View {
+	let title: String
+	
+	var body: some View {
+		Text(title)
+			.font(.system(size: 14))
+			.foregroundStyle(.primary)
+			.lineLimit(1)
+			.padding(.horizontal, 16)
+			.padding(.vertical, 4)
+			.frame(maxWidth: .infinity, alignment: .leading)
+			.contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
 	}
 }
 
