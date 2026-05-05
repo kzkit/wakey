@@ -103,7 +103,9 @@ struct SettingsView: View {
 	
 	private var scheduleToggleRow: some View {
 		HStack(spacing: 12) {
-			IconWell(systemImage: "calendar.badge.clock", tint: wakeyColor)
+			Image(systemName: "calendar.badge.clock")
+				.font(.system(size: 15, weight: .semibold))
+				.frame(width: 32, height: 32)
 			
 			Text("Enable schedule")
 				.font(.callout)

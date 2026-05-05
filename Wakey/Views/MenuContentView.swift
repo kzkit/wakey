@@ -137,7 +137,7 @@ struct MenuContentView: View {
 				tint: .primary
 			)
 		}
-		.buttonStyle(.plain)
+		.buttonStyle(NativeRowButtonStyle())
 		.simultaneousGesture(
 			TapGesture().onEnded {
 				dismiss()
