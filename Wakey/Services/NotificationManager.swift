@@ -7,13 +7,43 @@
 
 import UserNotifications
 
-final class NotificationManager {
+protocol NotificationSending {
+	func requestAuthorization()
+	func sendTimerEndedNotification()
+}
+
+protocol UserNotificationCentering {
+	func requestAuthorization(options: UNAuthorizationOptions, completionHandler: @escaping @Sendable (Bool, Error?) -> Void)
+	func add(_ request: UNNotificationRequest)
+}
+
+struct UserNotificationCenterAdapter: UserNotificationCentering {
+	private let notificationCenter: UNUserNotificationCenter
+	
+	init(notificationCenter: UNUserNotificationCenter = .current()) {
+		self.notificationCenter = notificationCenter
+	}
+	
+	func requestAuthorization(options: UNAuthorizationOptions, completionHandler: @escaping @Sendable (Bool, Error?) -> Void) {
+		notificationCenter.requestAuthorization(options: options, completionHandler: completionHandler)
+	}
+	
+	func add(_ request: UNNotificationRequest) {
+		notificationCenter.add(request, withCompletionHandler: nil)
+	}
+}
+
+final class NotificationManager: NotificationSending {
 	static let shared = NotificationManager()
 	
-	private init() {}
+	private let notificationCenter: UserNotificationCentering
+	
+	init(notificationCenter: UserNotificationCentering = UserNotificationCenterAdapter()) {
+		self.notificationCenter = notificationCenter
+	}
 	
 	func requestAuthorization() {
-		UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, error in
+		notificationCenter.requestAuthorization(options: [.alert, .sound]) { _, error in
 			if let error = error {
 				print("Notification authorization error: \(error)")
 			}
@@ -32,6 +62,6 @@ final class NotificationManager {
 			trigger: nil
 		)
 		
-		UNUserNotificationCenter.current().add(request)
+		notificationCenter.add(request)
 	}
 }

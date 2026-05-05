@@ -14,12 +14,10 @@ struct Schedule: Codable, Equatable {
 	
 	static let `default` = Schedule(isEnabled: false, startHour: 9, endHour: 17)
 	
-	func isWithinSchedule() -> Bool {
+	func isWithinSchedule(at date: Date = Date(), calendar: Calendar = .current) -> Bool {
 		guard isEnabled else { return false }
 		
-		let now = Date()
-		let calendar = Calendar.current
-		let hour = calendar.component(.hour, from: now)
+		let hour = calendar.component(.hour, from: date)
 		
 		if startHour < endHour {
 			return hour >= startHour && hour < endHour

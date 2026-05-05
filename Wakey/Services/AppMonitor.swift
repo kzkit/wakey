@@ -9,6 +9,19 @@ import Foundation
 import AppKit
 import Combine
 
+protocol RunningApplicationProviding {
+	var runningApplicationBundleIdentifiers: Set<String> { get }
+}
+
+struct WorkspaceRunningApplicationProvider: RunningApplicationProviding {
+	var runningApplicationBundleIdentifiers: Set<String> {
+		Set(
+			NSWorkspace.shared.runningApplications
+				.compactMap { $0.bundleIdentifier }
+		)
+	}
+}
+
 @MainActor
 final class AppMonitor: ObservableObject {
 	@Published private(set) var isActive = false
@@ -18,7 +31,8 @@ final class AppMonitor: ObservableObject {
 	}
 	
 	private var watchedApps: Set<String>
-	private let defaults = UserDefaults.standard
+	private let defaults: UserDefaults
+	private let applicationProvider: RunningApplicationProviding
 	private var timerCancellable: AnyCancellable?
 	private let workspaceNotificationCenter = NSWorkspace.shared.notificationCenter
 	private let appActivityNotifications: [Notification.Name] = [
@@ -26,9 +40,25 @@ final class AppMonitor: ObservableObject {
 		NSWorkspace.didTerminateApplicationNotification
 	]
 	
-	init() {
+	convenience init() {
+		self.init(
+			defaults: .standard,
+			applicationProvider: WorkspaceRunningApplicationProvider(),
+			startsMonitoring: true
+		)
+	}
+	
+	init(
+		defaults: UserDefaults,
+		applicationProvider: RunningApplicationProviding,
+		startsMonitoring: Bool
+	) {
+		self.defaults = defaults
+		self.applicationProvider = applicationProvider
 		watchedApps = Set(defaults.stringArray(forKey: DefaultsKey.watchedApps) ?? [])
-		startMonitoring()
+		if startsMonitoring {
+			startMonitoring()
+		}
 		checkRunningApps()
 	}
 	
@@ -57,12 +87,7 @@ final class AppMonitor: ObservableObject {
 	}
 	
 	private func checkRunningApps() {
-		let runningBundleIDs = Set(
-			NSWorkspace.shared.runningApplications
-				.compactMap { $0.bundleIdentifier }
-		)
-		
-		isActive = !watchedApps.intersection(runningBundleIDs).isEmpty
+		isActive = !watchedApps.intersection(applicationProvider.runningApplicationBundleIdentifiers).isEmpty
 	}
 	
 	private func saveWatchedApps() {

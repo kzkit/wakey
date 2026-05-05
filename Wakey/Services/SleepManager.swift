@@ -8,7 +8,19 @@
 import Foundation
 import IOKit.pwr_mgt
 
-final class SleepManager {
+protocol SleepManaging: AnyObject {
+	var isActive: Bool { get }
+	func preventSleep(reason: String) -> Bool
+	func allowSleep()
+}
+
+extension SleepManaging {
+	func preventSleep() -> Bool {
+		preventSleep(reason: "Wakey is keeping your Mac awake")
+	}
+}
+
+final class SleepManager: SleepManaging {
 	private var assertionID: IOPMAssertionID = IOPMAssertionID(0)
 	private(set) var isActive: Bool = false
 	

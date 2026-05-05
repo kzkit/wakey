@@ -18,13 +18,26 @@ final class SchedulerManager: ObservableObject {
 	
 	private var schedule: Schedule
 	private var timerCancellable: AnyCancellable?
-	private let defaults = UserDefaults.standard
+	private let defaults: UserDefaults
+	private let dateProvider: () -> Date
 	
-	init() {
+	convenience init() {
+		self.init(defaults: .standard, dateProvider: Date.init, startsMonitoring: true)
+	}
+	
+	init(
+		defaults: UserDefaults,
+		dateProvider: @escaping () -> Date,
+		startsMonitoring: Bool
+	) {
+		self.defaults = defaults
+		self.dateProvider = dateProvider
 		schedule = Self.loadSchedule(from: defaults)
 		
 		checkSchedule()
-		startMonitoring()
+		if startsMonitoring {
+			startMonitoring()
+		}
 	}
 	
 	var currentSchedule: Schedule {
@@ -46,7 +59,7 @@ final class SchedulerManager: ObservableObject {
 	}
 	
 	private func checkSchedule() {
-		isActive = schedule.isWithinSchedule()
+		isActive = schedule.isWithinSchedule(at: dateProvider())
 	}
 	
 	private static func loadSchedule(from defaults: UserDefaults) -> Schedule {

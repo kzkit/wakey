@@ -13,14 +13,38 @@ final class WakeyViewModel: ObservableObject {
 	@Published private(set) var isActive = false
 	@Published private(set) var remainingSeconds: TimeInterval?
 	
-	let schedulerManager = SchedulerManager()
-	let appMonitor = AppMonitor()
-	private let sleepManager = SleepManager()
+	let schedulerManager: SchedulerManager
+	let appMonitor: AppMonitor
+	private let sleepManager: SleepManaging
+	private let notificationSender: NotificationSending
+	private let startsCountdownTimers: Bool
 	private var timerCancellable: AnyCancellable?
 	private var cancellables = Set<AnyCancellable>()
 	private var manualTimerActive = false
 	
-	init() {
+	convenience init() {
+		self.init(
+			schedulerManager: SchedulerManager(),
+			appMonitor: AppMonitor(),
+			sleepManager: SleepManager(),
+			notificationSender: NotificationManager.shared,
+			startsCountdownTimers: true
+		)
+	}
+	
+	init(
+		schedulerManager: SchedulerManager,
+		appMonitor: AppMonitor,
+		sleepManager: SleepManaging,
+		notificationSender: NotificationSending,
+		startsCountdownTimers: Bool
+	) {
+		self.schedulerManager = schedulerManager
+		self.appMonitor = appMonitor
+		self.sleepManager = sleepManager
+		self.notificationSender = notificationSender
+		self.startsCountdownTimers = startsCountdownTimers
+		
 		schedulerManager.$isActive
 			.combineLatest(appMonitor.$isActive)
 			.sink { [weak self] _, _ in
@@ -46,7 +70,7 @@ final class WakeyViewModel: ObservableObject {
 		manualTimerActive = true
 		remainingSeconds = seconds
 		
-		if seconds != nil {
+		if seconds != nil && startsCountdownTimers {
 			startCountdownTimer()
 		}
 		
@@ -64,11 +88,15 @@ final class WakeyViewModel: ObservableObject {
 		guard let remaining = remainingSeconds else { return }
 		
 		if remaining <= 1 {
-			NotificationManager.shared.sendTimerEndedNotification()
+			notificationSender.sendTimerEndedNotification()
 			stop()
 		} else {
 			remainingSeconds = remaining - 1
 		}
+	}
+	
+	func advanceCountdownForTesting() {
+		tick()
 	}
 	
 	func refreshState() {
