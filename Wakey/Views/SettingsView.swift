@@ -10,16 +10,18 @@ import SwiftUI
 
 struct SettingsView: View {
 	@ObservedObject var viewModel: WakeyViewModel
+	@ObservedObject private var launchAtLoginManager: LaunchAtLoginManager
 	
 	@State private var schedule: Schedule
-	@State private var pendingWatchedApps: Set<String>
+	@State private var watchedApps: Set<String>
 	
 	private let wakeyColor = Color.blue
 	
 	init(viewModel: WakeyViewModel) {
 		self.viewModel = viewModel
+		_launchAtLoginManager = ObservedObject(initialValue: viewModel.launchAtLoginManager)
 		_schedule = State(initialValue: viewModel.schedulerManager.currentSchedule)
-		_pendingWatchedApps = State(initialValue: viewModel.appMonitor.currentWatchedApps)
+		_watchedApps = State(initialValue: viewModel.appMonitor.currentWatchedApps)
 	}
 	
 	var body: some View {
@@ -30,22 +32,19 @@ struct SettingsView: View {
 			
 			ScrollView {
 				VStack(alignment: .leading, spacing: 22) {
+					generalSection
 					scheduleSection
 					appSection
 				}
 				.padding(.horizontal, 24)
 				.padding(.vertical, 22)
 			}
-			
-			Divider()
-			
-			saveButtonRow
 		}
 		.frame(width: 460, height: 560)
 		.background(.regularMaterial)
 		.background(SettingsWindowAccessor())
 		.onAppear {
-			resetToSavedValues()
+			syncSavedValues()
 		}
 	}
 	
@@ -75,6 +74,88 @@ struct SettingsView: View {
 		}
 		.padding(.horizontal, 24)
 		.padding(.vertical, 18)
+	}
+	
+	private var generalSection: some View {
+		VStack(alignment: .leading, spacing: 10) {
+			sectionHeader(
+				icon: "gearshape.fill",
+				title: "General",
+				description: "Choose how Wakey starts and stays available."
+			)
+			
+			SettingsGroup {
+				launchAtLoginRow
+				
+				if launchAtLoginManager.requiresApproval {
+					SettingsDivider()
+					launchAtLoginApprovalRow
+				}
+				
+				if let errorMessage = launchAtLoginManager.errorMessage {
+					SettingsDivider()
+					statusMessageRow(
+						systemImage: "exclamationmark.triangle.fill",
+						tint: .orange,
+						title: errorMessage,
+						message: "Open System Settings if macOS needs your approval."
+					)
+				}
+			}
+		}
+	}
+	
+	private var launchAtLoginRow: some View {
+		HStack(spacing: 12) {
+			Image(systemName: "power")
+				.font(.system(size: 15, weight: .semibold))
+				.frame(width: 24, height: 24)
+			
+			VStack(alignment: .leading, spacing: 2) {
+				Text("Launch at login")
+					.font(.callout)
+				
+				Text("Open Wakey automatically when you sign in.")
+					.font(.caption)
+					.foregroundStyle(.secondary)
+			}
+			
+			Spacer(minLength: 0)
+			
+			Toggle("", isOn: Binding(
+				get: { launchAtLoginManager.isEnabled },
+				set: { launchAtLoginManager.setEnabled($0) }
+			))
+			.labelsHidden()
+			.toggleStyle(.switch)
+		}
+		.padding(.horizontal, 14)
+		.padding(.vertical, 10)
+	}
+	
+	private var launchAtLoginApprovalRow: some View {
+		HStack(spacing: 12) {
+			Image(systemName: "checkmark.shield.fill")
+				.font(.system(size: 15, weight: .semibold))
+				.frame(width: 24, height: 24)
+			VStack(alignment: .leading, spacing: 2) {
+				Text("Approval required")
+					.font(.callout)
+				
+				Text("macOS needs approval before Wakey can launch at login.")
+					.font(.caption)
+					.foregroundStyle(.secondary)
+			}
+			
+			Spacer(minLength: 0)
+			
+			Button("Open System Settings") {
+				launchAtLoginManager.openSystemSettings()
+			}
+			.buttonStyle(.borderless)
+		}
+		.padding(.horizontal, 14)
+		.padding(.vertical, 10)
 	}
 	
 	private var scheduleSection: some View {
@@ -112,7 +193,10 @@ struct SettingsView: View {
 			
 			Spacer(minLength: 0)
 			
-			Toggle("", isOn: $schedule.isEnabled)
+			Toggle("", isOn: Binding(
+				get: { schedule.isEnabled },
+				set: { updateSchedule(isEnabled: $0) }
+			))
 				.labelsHidden()
 				.toggleStyle(.switch)
 		}
@@ -122,7 +206,9 @@ struct SettingsView: View {
 	
 	private var activeHoursRow: some View {
 		HStack(spacing: 12) {
-			IconWell(systemImage: "timer", tint: .secondary)
+			Image(systemName: "timer")
+				.font(.system(size: 15, weight: .semibold))
+				.frame(width: 24, height: 24)
 			
 			Text("Active hours")
 				.font(.callout)
@@ -131,7 +217,7 @@ struct SettingsView: View {
 			
 			HStack(spacing: 8) {
 				hourMenu(selectedHour: schedule.startHour) { selectedHour in
-					schedule.startHour = selectedHour
+					updateSchedule(startHour: selectedHour)
 				}
 				
 				Text("to")
@@ -139,7 +225,7 @@ struct SettingsView: View {
 					.foregroundStyle(.secondary)
 				
 				hourMenu(selectedHour: schedule.endHour) { selectedHour in
-					schedule.endHour = selectedHour
+					updateSchedule(endHour: selectedHour)
 				}
 			}
 		}
@@ -150,8 +236,9 @@ struct SettingsView: View {
 	
 	private var scheduleActiveRow: some View {
 		HStack(spacing: 12) {
-			IconWell(systemImage: "checkmark", tint: .green)
-			
+			Image(systemName: "checkmark")
+				.font(.system(size: 15, weight: .semibold))
+				.frame(width: 24, height: 24)
 			VStack(alignment: .leading, spacing: 2) {
 				Text("Schedule active now")
 					.font(.callout)
@@ -200,8 +287,9 @@ struct SettingsView: View {
 	
 	private var emptyAppsRow: some View {
 		HStack(spacing: 12) {
-			IconWell(systemImage: "app.dashed", tint: .secondary)
-			
+			Image(systemName: "app.dashed")
+				.font(.system(size: 15, weight: .semibold))
+				.frame(width: 24, height: 24)
 			VStack(alignment: .leading, spacing: 2) {
 				Text("No running apps")
 					.font(.callout)
@@ -218,7 +306,7 @@ struct SettingsView: View {
 	}
 	
 	private func appRow(_ app: InstalledApp) -> some View {
-		let isWatched = pendingWatchedApps.contains(app.bundleIdentifier)
+		let isWatched = watchedApps.contains(app.bundleIdentifier)
 		
 		return AppSelectionRow(
 			app: app,
@@ -229,28 +317,6 @@ struct SettingsView: View {
 				toggleWatchedApp(bundleIdentifier: app.bundleIdentifier, isWatched: isWatched)
 			}
 		}
-	}
-	
-	private var saveButtonRow: some View {
-		HStack(spacing: 12) {
-			if hasChanges {
-				Text("Unsaved changes")
-					.font(.caption)
-					.foregroundStyle(.secondary)
-			}
-			
-			Spacer(minLength: 0)
-			
-			Button("Save") {
-				saveChanges()
-			}
-			.buttonStyle(.borderedProminent)
-			.tint(wakeyColor)
-			.disabled(!hasChanges)
-			.keyboardShortcut(.defaultAction)
-		}
-		.padding(.horizontal, 24)
-		.padding(.vertical, 14)
 	}
 	
 	private func sectionHeader(icon: String, title: String, description: String) -> some View {
@@ -272,12 +338,36 @@ struct SettingsView: View {
 		}
 	}
 	
+	private func updateSchedule(
+		isEnabled: Bool? = nil,
+		startHour: Int? = nil,
+		endHour: Int? = nil
+	) {
+		var updatedSchedule = schedule
+		if let isEnabled {
+			updatedSchedule.isEnabled = isEnabled
+		}
+		if let startHour {
+			updatedSchedule.startHour = startHour
+		}
+		if let endHour {
+			updatedSchedule.endHour = endHour
+		}
+		
+		schedule = updatedSchedule
+		viewModel.schedulerManager.updateSchedule(updatedSchedule)
+		viewModel.refreshState()
+	}
+	
 	private func toggleWatchedApp(bundleIdentifier: String, isWatched: Bool) {
 		if isWatched {
-			pendingWatchedApps.remove(bundleIdentifier)
+			watchedApps.remove(bundleIdentifier)
 		} else {
-			pendingWatchedApps.insert(bundleIdentifier)
+			watchedApps.insert(bundleIdentifier)
 		}
+		
+		viewModel.appMonitor.setWatchedApps(watchedApps)
+		viewModel.refreshState()
 	}
 	
 	private func hourMenu(selectedHour: Int, onSelect: @escaping (Int) -> Void) -> some View {
@@ -312,15 +402,10 @@ struct SettingsView: View {
 		let sortedApps = sortApps(apps.values)
 
 		return (
-			watched: sortedApps.filter { pendingWatchedApps.contains($0.bundleIdentifier) },
-			available: sortedApps.filter { !pendingWatchedApps.contains($0.bundleIdentifier) },
+			watched: sortedApps.filter { watchedApps.contains($0.bundleIdentifier) },
+			available: sortedApps.filter { !watchedApps.contains($0.bundleIdentifier) },
 			isEmpty: sortedApps.isEmpty
 		)
-	}
-	
-	private var hasChanges: Bool {
-		schedule != viewModel.schedulerManager.currentSchedule ||
-		pendingWatchedApps != viewModel.appMonitor.currentWatchedApps
 	}
 	
 	private func appGroup(title: String, apps: [InstalledApp]) -> some View {
@@ -367,7 +452,7 @@ struct SettingsView: View {
 	}
 	
 	private func addStoppedWatchedApps(to apps: inout [String: InstalledApp]) {
-		for bundleID in pendingWatchedApps where apps[bundleID] == nil {
+		for bundleID in watchedApps where apps[bundleID] == nil {
 			guard let app = installedApp(for: bundleID) else {
 				continue
 			}
@@ -394,8 +479,8 @@ struct SettingsView: View {
 	
 	private func sortApps(_ apps: Dictionary<String, InstalledApp>.Values) -> [InstalledApp] {
 		apps.sorted {
-			let firstInWatched = pendingWatchedApps.contains($0.bundleIdentifier)
-			let secondInWatched = pendingWatchedApps.contains($1.bundleIdentifier)
+			let firstInWatched = watchedApps.contains($0.bundleIdentifier)
+			let secondInWatched = watchedApps.contains($1.bundleIdentifier)
 			
 			if firstInWatched != secondInWatched {
 				return firstInWatched
@@ -405,15 +490,30 @@ struct SettingsView: View {
 		}
 	}
 	
-	private func saveChanges() {
-		viewModel.schedulerManager.updateSchedule(schedule)
-		viewModel.appMonitor.setWatchedApps(pendingWatchedApps)
-		viewModel.refreshState()
+	private func syncSavedValues() {
+		schedule = viewModel.schedulerManager.currentSchedule
+		watchedApps = viewModel.appMonitor.currentWatchedApps
+		launchAtLoginManager.refreshStatus()
 	}
 	
-	private func resetToSavedValues() {
-		schedule = viewModel.schedulerManager.currentSchedule
-		pendingWatchedApps = viewModel.appMonitor.currentWatchedApps
+	private func statusMessageRow(systemImage: String, tint: Color, title: String, message: String) -> some View {
+		HStack(spacing: 12) {
+			Image(systemName: systemImage)
+				.font(.system(size: 15, weight: .semibold))
+				.frame(width: 24, height: 24)
+			VStack(alignment: .leading, spacing: 2) {
+				Text(title)
+					.font(.callout)
+				
+				Text(message)
+					.font(.caption)
+					.foregroundStyle(.secondary)
+			}
+			
+			Spacer(minLength: 0)
+		}
+		.padding(.horizontal, 14)
+		.padding(.vertical, 10)
 	}
 }
 
@@ -442,24 +542,6 @@ private struct SettingsDivider: View {
 	var body: some View {
 		Divider()
 			.padding(.leading, 60)
-	}
-}
-
-private struct IconWell: View {
-	let systemImage: String
-	let tint: Color
-	
-	var body: some View {
-		ZStack {
-			Circle()
-				.fill(tint == Color.secondary ? Color.secondary.opacity(0.2) : tint.opacity(0.16))
-			
-			Image(systemName: systemImage)
-				.font(.system(size: 14, weight: .semibold))
-				.foregroundStyle(tint)
-				.symbolRenderingMode(.hierarchical)
-		}
-		.frame(width: 32, height: 32)
 	}
 }
 
@@ -513,7 +595,9 @@ private struct AppSelectionRow: View {
 				.frame(width: 30, height: 30)
 				.clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
 		} else {
-			IconWell(systemImage: "app", tint: .secondary)
+			Image(systemName: "app")
+				.font(.system(size: 15, weight: .semibold))
+				.frame(width: 24, height: 24)
 		}
 	}
 	

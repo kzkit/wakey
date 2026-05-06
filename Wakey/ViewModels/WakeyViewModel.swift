@@ -15,6 +15,7 @@ final class WakeyViewModel: ObservableObject {
 	
 	let schedulerManager: SchedulerManager
 	let appMonitor: AppMonitor
+	let launchAtLoginManager: LaunchAtLoginManager
 	private let sleepManager: SleepManaging
 	private let notificationSender: NotificationSending
 	private let startsCountdownTimers: Bool
@@ -26,6 +27,7 @@ final class WakeyViewModel: ObservableObject {
 		self.init(
 			schedulerManager: SchedulerManager(),
 			appMonitor: AppMonitor(),
+			launchAtLoginManager: LaunchAtLoginManager(),
 			sleepManager: SleepManager(),
 			notificationSender: NotificationManager.shared,
 			startsCountdownTimers: true
@@ -35,12 +37,14 @@ final class WakeyViewModel: ObservableObject {
 	init(
 		schedulerManager: SchedulerManager,
 		appMonitor: AppMonitor,
+		launchAtLoginManager: LaunchAtLoginManager,
 		sleepManager: SleepManaging,
 		notificationSender: NotificationSending,
 		startsCountdownTimers: Bool
 	) {
 		self.schedulerManager = schedulerManager
 		self.appMonitor = appMonitor
+		self.launchAtLoginManager = launchAtLoginManager
 		self.sleepManager = sleepManager
 		self.notificationSender = notificationSender
 		self.startsCountdownTimers = startsCountdownTimers

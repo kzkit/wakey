@@ -9,6 +9,7 @@ final class WakeyViewModelTests: XCTestCase {
 	private var appDefaults: UserDefaults!
 	private var now: Date!
 	private var runningApplications: MockRunningApplicationProvider!
+	private var launchAtLoginService: MockViewModelLaunchAtLoginService!
 	private var sleepManager: MockSleepManager!
 	private var notificationSender: MockNotificationSender!
 	
@@ -22,6 +23,7 @@ final class WakeyViewModelTests: XCTestCase {
 		appDefaults.removePersistentDomain(forName: appDefaultsSuiteName)
 		now = Self.date(hour: 10)
 		runningApplications = MockRunningApplicationProvider()
+		launchAtLoginService = MockViewModelLaunchAtLoginService()
 		sleepManager = MockSleepManager()
 		notificationSender = MockNotificationSender()
 	}
@@ -35,6 +37,7 @@ final class WakeyViewModelTests: XCTestCase {
 		appDefaultsSuiteName = nil
 		now = nil
 		runningApplications = nil
+		launchAtLoginService = nil
 		sleepManager = nil
 		notificationSender = nil
 		super.tearDown()
@@ -146,6 +149,7 @@ final class WakeyViewModelTests: XCTestCase {
 		WakeyViewModel(
 			schedulerManager: schedulerManager ?? makeSchedulerManager(),
 			appMonitor: appMonitor ?? makeAppMonitor(),
+			launchAtLoginManager: LaunchAtLoginManager(service: launchAtLoginService),
 			sleepManager: sleepManager,
 			notificationSender: notificationSender,
 			startsCountdownTimers: false
@@ -180,6 +184,14 @@ private final class MockSleepManager: SleepManaging {
 		allowSleepCallCount += 1
 		isActive = false
 	}
+}
+
+private final class MockViewModelLaunchAtLoginService: LaunchAtLoginServicing {
+	var status: LaunchAtLoginStatus = .notRegistered
+	
+	func register() throws {}
+	func unregister() throws {}
+	func openSystemSettingsLoginItems() {}
 }
 
 private final class MockNotificationSender: NotificationSending {
