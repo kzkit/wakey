@@ -197,8 +197,8 @@ struct SettingsView: View {
 				get: { schedule.isEnabled },
 				set: { updateSchedule(isEnabled: $0) }
 			))
-				.labelsHidden()
-				.toggleStyle(.switch)
+			.labelsHidden()
+			.toggleStyle(.switch)
 		}
 		.padding(.horizontal, 14)
 		.padding(.vertical, 10)
@@ -256,7 +256,7 @@ struct SettingsView: View {
 	
 	private var appSection: some View {
 		let appSections = categorizedApps
-
+		
 		return VStack(alignment: .leading, spacing: 10) {
 			sectionHeader(
 				icon: "bolt.badge.automatic.fill",
@@ -271,11 +271,6 @@ struct SettingsView: View {
 					if !appSections.watched.isEmpty {
 						appGroup(title: "Watching", apps: appSections.watched)
 					}
-					
-					if !appSections.watched.isEmpty && !appSections.available.isEmpty {
-						SettingsDivider()
-					}
-					
 					appGroup(
 						title: appSections.watched.isEmpty ? "Available Apps" : "Available While Open",
 						apps: appSections.available
@@ -400,7 +395,7 @@ struct SettingsView: View {
 		var apps = runningAppsByBundleIdentifier()
 		addStoppedWatchedApps(to: &apps)
 		let sortedApps = sortApps(apps.values)
-
+		
 		return (
 			watched: sortedApps.filter { watchedApps.contains($0.bundleIdentifier) },
 			available: sortedApps.filter { !watchedApps.contains($0.bundleIdentifier) },
@@ -426,10 +421,6 @@ struct SettingsView: View {
 					.padding(.bottom, 12)
 			} else {
 				ForEach(Array(apps.enumerated()), id: \.element.bundleIdentifier) { index, app in
-					if index > 0 {
-						SettingsDivider()
-					}
-					
 					appRow(app)
 				}
 			}
