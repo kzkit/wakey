@@ -33,6 +33,7 @@ final class SoftwareUpdateManager: NSObject, ObservableObject {
 	func start() {
 #if DIRECT_DISTRIBUTION
 		_ = updaterController
+		checkForUpdateInformation()
 #endif
 	}
 	
@@ -43,6 +44,10 @@ final class SoftwareUpdateManager: NSObject, ObservableObject {
 	}
 	
 #if DIRECT_DISTRIBUTION
+	private func checkForUpdateInformation() {
+		updaterController.updater.checkForUpdateInformation()
+	}
+	
 	private func setUpdateAvailable(_ isAvailable: Bool) {
 		isUpdateAvailable = isAvailable
 	}
