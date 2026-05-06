@@ -7,7 +7,9 @@
 
 import Combine
 import Foundation
+#if DIRECT_DISTRIBUTION
 import Sparkle
+#endif
 
 @MainActor
 final class SoftwareUpdateManager: NSObject, ObservableObject {
@@ -15,30 +17,39 @@ final class SoftwareUpdateManager: NSObject, ObservableObject {
 	
 	@Published private(set) var isUpdateAvailable = false
 	
+#if DIRECT_DISTRIBUTION
 	private lazy var updaterController = SPUStandardUpdaterController(
 		startingUpdater: true,
 		updaterDelegate: self,
 		userDriverDelegate: nil
 	)
 	private var didFindUpdateInCurrentCycle = false
+#endif
 	
 	private override init() {
 		super.init()
 	}
 	
 	func start() {
+#if DIRECT_DISTRIBUTION
 		_ = updaterController
+#endif
 	}
 	
 	func showUpdate() {
+#if DIRECT_DISTRIBUTION
 		updaterController.checkForUpdates(nil)
+#endif
 	}
 	
+#if DIRECT_DISTRIBUTION
 	private func setUpdateAvailable(_ isAvailable: Bool) {
 		isUpdateAvailable = isAvailable
 	}
+#endif
 }
 
+#if DIRECT_DISTRIBUTION
 extension SoftwareUpdateManager: SPUUpdaterDelegate {
 	func updater(_ updater: SPUUpdater, didFindValidUpdate item: SUAppcastItem) {
 		didFindUpdateInCurrentCycle = true
@@ -67,3 +78,4 @@ extension SoftwareUpdateManager: SPUUpdaterDelegate {
 		didFindUpdateInCurrentCycle = false
 	}
 }
+#endif

@@ -9,7 +9,7 @@
             <sparkle:shortVersionString>1.0.0</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>15.7</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <enclosure url="https://github.com/kzkit/wakey/releases/download/v1.0.0/Wakey-1.0.0.zip" length="5407269" type="application/octet-stream"/>
+            <enclosure url="https://raw.githubusercontent.com/kzkit/wakey/main/Wakey-1.0.0.zip" length="5402218" type="application/octet-stream"/>
         </item>
     </channel>
 </rss>

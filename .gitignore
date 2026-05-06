@@ -1,6 +1,8 @@
 .DS_Store
 .build/
 DerivedData/
+*.xcuserstate
+xcuserdata/
 release/*.zip
 release/*.dmg
 release/appcast.xml
