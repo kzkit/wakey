@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		FC7385472FAACFE200C894CD /* README.md in Resources */ = {isa = PBXBuildFile; fileRef = FC7385462FAACFE200C894CD /* README.md */; };
 		FC7A00012FCB000000000001 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = FC7A00002FCB000000000001 /* Sparkle */; };
 /* End PBXBuildFile section */
 
@@ -21,6 +22,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		FC7385462FAACFE200C894CD /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
 		FC8346AB2F2648D1002DB31B /* Wakey.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Wakey.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		FC9000032FBA000000000001 /* WakeyTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = WakeyTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -60,6 +62,7 @@
 		FC8346A22F2648D1002DB31B = {
 			isa = PBXGroup;
 			children = (
+				FC7385462FAACFE200C894CD /* README.md */,
 				FC8346AD2F2648D1002DB31B /* Wakey */,
 				FC9000042FBA000000000001 /* WakeyTests */,
 				FC8346AC2F2648D1002DB31B /* Products */,
@@ -171,6 +174,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				FC7385472FAACFE200C894CD /* README.md in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
