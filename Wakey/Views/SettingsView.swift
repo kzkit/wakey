@@ -26,10 +26,6 @@ struct SettingsView: View {
 	
 	var body: some View {
 		VStack(spacing: 0) {
-			header
-			
-			Divider()
-			
 			ScrollView {
 				VStack(alignment: .leading, spacing: 22) {
 					generalSection
@@ -46,34 +42,6 @@ struct SettingsView: View {
 		.onAppear {
 			syncSavedValues()
 		}
-	}
-	
-	private var header: some View {
-		HStack(alignment: .center, spacing: 12) {
-			VStack(alignment: .leading, spacing: 3) {
-				Text("Wakey Settings")
-					.font(.system(size: 20, weight: .semibold))
-				
-				Text("Choose when your Mac stays awake.")
-					.font(.subheadline)
-					.foregroundStyle(.secondary)
-			}
-			
-			Spacer(minLength: 0)
-			
-			Label(viewModel.isActive ? "Active" : "Inactive", systemImage: viewModel.isActive ? "bolt.fill" : "moon.zzz.fill")
-				.font(.caption.weight(.semibold))
-				.foregroundStyle(viewModel.isActive ? wakeyColor : .secondary)
-				.labelStyle(.titleAndIcon)
-				.padding(.horizontal, 10)
-				.padding(.vertical, 6)
-				.background(
-					Capsule()
-						.fill(viewModel.isActive ? wakeyColor.opacity(0.12) : Color.secondary.opacity(0.12))
-				)
-		}
-		.padding(.horizontal, 24)
-		.padding(.vertical, 18)
 	}
 	
 	private var generalSection: some View {
@@ -617,7 +585,7 @@ private struct SettingsWindowAccessor: NSViewRepresentable {
 			guard let window = view.window else {
 				return
 			}
-			
+			window.title = "Settings"
 			SettingsWindowCoordinator.shared.register(window: window)
 		}
 	}
