@@ -5,7 +5,7 @@
         <item>
             <title>1.0.3</title>
             <pubDate>Fri, 08 May 2026 01:03:59 +0800</pubDate>
-            <sparkle:version>1</sparkle:version>
+            <sparkle:version>4</sparkle:version>
             <sparkle:shortVersionString>1.0.3</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>15.7</sparkle:minimumSystemVersion>
             <enclosure url="https://github.com/kzkit/wakey/releases/download/v1.0.3/wakey-1.0.3.zip" length="5418389" type="application/octet-stream"/>
