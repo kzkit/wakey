@@ -597,7 +597,32 @@
       }
     },
     "Let display turn off" : {
-
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bildschirm ausschalten lassen"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Laisser l’écran s’éteindre"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ディスプレイのオフを許可"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "允许屏幕关闭"
+          }
+        }
+      }
     },
     "macOS needs approval before Wakey can launch at login." : {
       "localizations" : {
@@ -1331,7 +1356,32 @@
       }
     },
     "Your Mac stays awake; the screen follows macOS display settings." : {
-
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dein Mac bleibt wach; der Bildschirm folgt den macOS-Bildschirmeinstellungen."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Votre Mac reste éveillé ; l’écran suit les réglages d’affichage de macOS."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Macはスリープせず、画面はmacOSのディスプレイ設定に従います。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你的 Mac 保持唤醒；屏幕遵循 macOS 显示设置。"
+          }
+        }
+      }
     }
   },
   "version" : "1.1"
