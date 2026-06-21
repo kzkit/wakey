@@ -21,10 +21,10 @@ enum TimerDuration: Int, CaseIterable, Identifiable {
 	
 	var displayName: String {
 		switch self {
-		case .oneMinute: return "1 minute"
-		case .fiveMinutes: return "5 minutes"
-		case .tenMinutes: return "10 minutes"
-		case .forever: return "Forever"
+		case .oneMinute: return L10n.string("1 minute")
+		case .fiveMinutes: return L10n.string("5 minutes")
+		case .tenMinutes: return L10n.string("10 minutes")
+		case .forever: return L10n.string("Forever")
 		}
 	}
 }

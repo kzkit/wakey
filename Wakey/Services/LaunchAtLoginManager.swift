@@ -86,7 +86,7 @@ final class LaunchAtLoginManager: ObservableObject {
 				try service.unregister()
 			}
 		} catch {
-			errorMessage = "Couldn't update launch at login."
+			errorMessage = L10n.string("Couldn't update launch at login.")
 		}
 		
 		refreshStatus()

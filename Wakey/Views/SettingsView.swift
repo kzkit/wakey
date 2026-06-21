@@ -290,10 +290,10 @@ struct SettingsView: View {
 				.frame(width: 22, height: 22)
 			
 			VStack(alignment: .leading, spacing: 2) {
-				Text(title)
+				Text(L10n.string(title))
 					.font(.subheadline.weight(.semibold))
 				
-				Text(description)
+				Text(L10n.string(description))
 					.font(.subheadline)
 					.foregroundStyle(.secondary)
 					.fixedSize(horizontal: false, vertical: true)
@@ -373,7 +373,7 @@ struct SettingsView: View {
 	
 	private func appGroup(title: String, apps: [InstalledApp]) -> some View {
 		VStack(alignment: .leading, spacing: 0) {
-			Text(title)
+			Text(L10n.string(title))
 				.font(.caption.weight(.semibold))
 				.foregroundStyle(.secondary)
 				.textCase(.uppercase)
@@ -464,7 +464,7 @@ struct SettingsView: View {
 				Text(title)
 					.font(.callout)
 				
-				Text(message)
+				Text(L10n.string(message))
 					.font(.caption)
 					.foregroundStyle(.secondary)
 			}
@@ -585,7 +585,7 @@ private struct SettingsWindowAccessor: NSViewRepresentable {
 			guard let window = view.window else {
 				return
 			}
-			window.title = "Settings"
+			window.title = L10n.string("Settings")
 			SettingsWindowCoordinator.shared.register(window: window)
 		}
 	}

@@ -16,7 +16,7 @@ protocol SleepManaging: AnyObject {
 
 extension SleepManaging {
 	func preventSleep() -> Bool {
-		preventSleep(reason: "Wakey is keeping your Mac awake")
+		preventSleep(reason: L10n.string("Wakey is keeping your Mac awake"))
 	}
 }
 
@@ -25,7 +25,7 @@ final class SleepManager: SleepManaging {
 	private(set) var isActive: Bool = false
 	
 	/// Prevents system sleep. Returns success/failure.
-	func preventSleep(reason: String = "Wakey is keeping your Mac awake") -> Bool {
+	func preventSleep(reason: String = L10n.string("Wakey is keeping your Mac awake")) -> Bool {
 		guard !isActive else { return true }
 		
 		let result = IOPMAssertionCreateWithName(

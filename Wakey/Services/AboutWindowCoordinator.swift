@@ -31,7 +31,7 @@ final class AboutWindowCoordinator: NSObject, NSWindowDelegate {
 			defer: false
 		)
 		
-		window.title = "About Wakey"
+		window.title = L10n.string("About Wakey")
 		window.titleVisibility = .hidden
 		window.titlebarAppearsTransparent = true
 		window.isMovableByWindowBackground = true

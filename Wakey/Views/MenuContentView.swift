@@ -66,7 +66,7 @@ struct MenuContentView: View {
 	
 	private var timerSection: some View {
 		VStack(alignment: .leading, spacing: 8) {
-			sectionTitle("Quick Start")
+			sectionTitle(L10n.string("Quick Start"))
 			
 			timerControls
 		}
@@ -74,8 +74,8 @@ struct MenuContentView: View {
 	
 	private var activeControl: some View {
 		NativeMenuRowButton(
-			title: "Stop",
-			detail: "Allow your Mac to sleep normally.",
+			title: L10n.string("Stop"),
+			detail: L10n.string("Allow your Mac to sleep normally."),
 			systemImage: "stop.fill",
 			tint: .red,
 			action: {
@@ -105,7 +105,7 @@ struct MenuContentView: View {
 	private var footerSection: some View {
 		VStack(spacing: 2) {
 			SettingsLink {
-				FooterMenuRow(title: "Settings")
+				FooterMenuRow(title: L10n.string("Settings"))
 			}
 			.buttonStyle(NativeRowButtonStyle())
 			.simultaneousGesture(
@@ -118,7 +118,7 @@ struct MenuContentView: View {
 			)
 			
 			FooterMenuRowButton(
-				title: "About",
+				title: L10n.string("About"),
 				action: {
 					dismiss()
 					DispatchQueue.main.async {
@@ -129,7 +129,7 @@ struct MenuContentView: View {
 			
 			if softwareUpdateManager.isUpdateAvailable {
 				FooterMenuRowButton(
-					title: "Update",
+					title: L10n.string("Update"),
 					action: {
 						dismiss()
 						DispatchQueue.main.async {
@@ -140,7 +140,7 @@ struct MenuContentView: View {
 			}
 			
 			FooterMenuRowButton(
-				title: "Quit",
+				title: L10n.string("Quit"),
 				action: {
 					performAndDismissMenu {
 						NSApplication.shared.terminate(nil)
@@ -152,19 +152,19 @@ struct MenuContentView: View {
 	
 	private var statusTitle: String {
 		guard viewModel.isActive else {
-			return "Inactive"
+			return L10n.string("Inactive")
 		}
 		
 		if viewModel.canStop {
-			return "Manual session running"
+			return L10n.string("Manual session running")
 		}
 		
-		return "Keeping Mac awake"
+		return L10n.string("Keeping Mac awake")
 	}
 	
 	private var statusDetail: String? {
 		guard viewModel.isActive else {
-			return "Choose a duration to keep your Mac awake."
+			return L10n.string("Choose a duration to keep your Mac awake.")
 		}
 		
 		return viewModel.statusText
@@ -178,7 +178,7 @@ struct MenuContentView: View {
 	}
 	
 	private func timerDetail(for duration: TimerDuration) -> String? {
-		duration == .forever ? "Until you stop it." : nil
+		duration == .forever ? L10n.string("Until you stop it.") : nil
 	}
 	
 	private func performAndDismissMenu(_ action: () -> Void) {

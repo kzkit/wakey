@@ -50,10 +50,10 @@ struct AboutView: View {
 	private var versionText: String {
 		let version = bundleValue(for: "CFBundleShortVersionString") ?? "1.0"
 		guard let build = bundleValue(for: "CFBundleVersion") else {
-			return "Version \(version)"
+			return L10n.format("Version %@", version)
 		}
 		
-		return "Version \(version) (\(build))"
+		return L10n.format("Version %@ (%@)", version, build)
 	}
 	
 	private func bundleValue(for key: String) -> String? {

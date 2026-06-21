@@ -53,7 +53,7 @@ final class NotificationManager: NotificationSending {
 	func sendTimerEndedNotification() {
 		let content = UNMutableNotificationContent()
 		content.title = "Wakey"
-		content.body = "Timer ended. Your Mac can sleep now."
+		content.body = L10n.string("Timer ended. Your Mac can sleep now.")
 		content.sound = .default
 		
 		let request = UNNotificationRequest(

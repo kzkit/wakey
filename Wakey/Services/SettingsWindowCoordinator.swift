@@ -13,7 +13,7 @@ final class SettingsWindowCoordinator {
 	
 	private weak var settingsWindow: NSWindow?
 	private var pendingRaiseAttempts = 0
-	private let settingsWindowTitle = "Settings"
+	private var settingsWindowTitle: String { L10n.string("Settings") }
 	private var restoreWindowLevelWorkItem: DispatchWorkItem?
 	
 	private init() {}

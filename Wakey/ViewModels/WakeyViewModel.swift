@@ -62,7 +62,7 @@ final class WakeyViewModel: ObservableObject {
 	}
 	
 	var statusText: String {
-		guard isActive else { return "Inactive" }
+		guard isActive else { return L10n.string("Inactive") }
 		
 		return remainingSeconds.map(formattedStatusTime) ?? nonTimedStatusText
 	}
@@ -121,14 +121,14 @@ final class WakeyViewModel: ObservableObject {
 	
 	private var nonTimedStatusText: String {
 		if schedulerManager.isActive {
-			return "Scheduled run"
+			return L10n.string("Scheduled run")
 		}
 		
 		if appMonitor.isActive {
-			return "App running"
+			return L10n.string("App running")
 		}
 		
-		return "Forever"
+		return L10n.string("Forever")
 	}
 	
 	private func formattedStatusTime(_ remaining: TimeInterval) -> String {
