@@ -38,6 +38,8 @@
 	<true/>
 	<key>SUFeedURL</key>
 	<string>https://raw.githubusercontent.com/kzkit/wakey/main/appcast.xml</string>
+	<key>SUPublicEDKey</key>
+	<string>/qRm+hCmfmynajXIxFnLitNnEnFZWhxjBZpfyNnbZsM=</string>
 	<key>SUScheduledCheckInterval</key>
 	<integer>86400</integer>
 </dict>
