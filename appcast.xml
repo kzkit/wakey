@@ -4,11 +4,11 @@
         <title>Wakey</title>
         <item>
             <title>1.0.3</title>
-            <pubDate>Fri, 08 May 2026 01:03:59 +0800</pubDate>
+            <pubDate>Sun, 21 Jun 2026 13:37:59 +0800</pubDate>
             <sparkle:version>4</sparkle:version>
             <sparkle:shortVersionString>1.0.3</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>15.7</sparkle:minimumSystemVersion>
-            <enclosure url="https://github.com/kzkit/wakey/releases/download/v1.0.3/wakey-1.0.3.zip" length="5418389" type="application/octet-stream"/>
+            <enclosure url="https://github.com/kzkit/wakey/releases/download/v1.0.3/wakey-1.0.3.zip" length="5418465" type="application/octet-stream" sparkle:edSignature="Qt8h2mPXGL6J3VxUv28Au3vSBW9fksHxbIbFKBmI+xDZ029QrBw+J/ahNF7F3S/fs72KU7eBUDrzX7CM6U1zAA=="/>
         </item>
     </channel>
 </rss>
