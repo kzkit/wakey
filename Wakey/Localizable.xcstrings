@@ -596,6 +596,9 @@
         }
       }
     },
+    "Let display turn off" : {
+
+    },
     "macOS needs approval before Wakey can launch at login." : {
       "localizations" : {
         "de" : {
@@ -1326,6 +1329,9 @@
           }
         }
       }
+    },
+    "Your Mac stays awake; the screen follows macOS display settings." : {
+
     }
   },
   "version" : "1.1"

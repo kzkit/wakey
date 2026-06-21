@@ -5,8 +5,10 @@ import XCTest
 final class WakeyViewModelTests: XCTestCase {
 	private var schedulerDefaultsSuiteName: String!
 	private var appDefaultsSuiteName: String!
+	private var viewModelDefaultsSuiteName: String!
 	private var schedulerDefaults: UserDefaults!
 	private var appDefaults: UserDefaults!
+	private var viewModelDefaults: UserDefaults!
 	private var now: Date!
 	private var runningApplications: MockRunningApplicationProvider!
 	private var launchAtLoginService: MockViewModelLaunchAtLoginService!
@@ -17,10 +19,13 @@ final class WakeyViewModelTests: XCTestCase {
 		super.setUp()
 		schedulerDefaultsSuiteName = "WakeyTests.scheduler.\(UUID().uuidString)"
 		appDefaultsSuiteName = "WakeyTests.apps.\(UUID().uuidString)"
+		viewModelDefaultsSuiteName = "WakeyTests.viewModel.\(UUID().uuidString)"
 		schedulerDefaults = UserDefaults(suiteName: schedulerDefaultsSuiteName)
 		appDefaults = UserDefaults(suiteName: appDefaultsSuiteName)
+		viewModelDefaults = UserDefaults(suiteName: viewModelDefaultsSuiteName)
 		schedulerDefaults.removePersistentDomain(forName: schedulerDefaultsSuiteName)
 		appDefaults.removePersistentDomain(forName: appDefaultsSuiteName)
+		viewModelDefaults.removePersistentDomain(forName: viewModelDefaultsSuiteName)
 		now = Self.date(hour: 10)
 		runningApplications = MockRunningApplicationProvider()
 		launchAtLoginService = MockViewModelLaunchAtLoginService()
@@ -31,10 +36,13 @@ final class WakeyViewModelTests: XCTestCase {
 	override func tearDown() {
 		schedulerDefaults.removePersistentDomain(forName: schedulerDefaultsSuiteName)
 		appDefaults.removePersistentDomain(forName: appDefaultsSuiteName)
+		viewModelDefaults.removePersistentDomain(forName: viewModelDefaultsSuiteName)
 		schedulerDefaults = nil
 		appDefaults = nil
+		viewModelDefaults = nil
 		schedulerDefaultsSuiteName = nil
 		appDefaultsSuiteName = nil
+		viewModelDefaultsSuiteName = nil
 		now = nil
 		runningApplications = nil
 		launchAtLoginService = nil
@@ -62,6 +70,7 @@ final class WakeyViewModelTests: XCTestCase {
 		XCTAssertNil(viewModel.remainingSeconds)
 		XCTAssertEqual(viewModel.statusText, "Forever")
 		XCTAssertEqual(sleepManager.preventSleepCallCount, 1)
+		XCTAssertEqual(sleepManager.displayBehaviors, [.keepDisplayAwake])
 		
 		viewModel.stop()
 		
@@ -69,6 +78,38 @@ final class WakeyViewModelTests: XCTestCase {
 		XCTAssertFalse(viewModel.canStop)
 		XCTAssertNil(viewModel.remainingSeconds)
 		XCTAssertEqual(sleepManager.allowSleepCallCount, 1)
+	}
+
+	func testStartAllowsDisplayOffWhenSettingIsEnabled() {
+		let viewModel = makeViewModel()
+
+		viewModel.setLetsDisplayTurnOff(true)
+		viewModel.start(duration: .forever)
+
+		XCTAssertTrue(viewModel.isActive)
+		XCTAssertEqual(sleepManager.preventSleepCallCount, 1)
+		XCTAssertEqual(sleepManager.displayBehaviors, [.allowDisplayOff])
+	}
+
+	func testDisplayOffSettingPersists() {
+		let viewModel = makeViewModel()
+
+		viewModel.setLetsDisplayTurnOff(true)
+		let reloadedViewModel = makeViewModel()
+
+		XCTAssertTrue(reloadedViewModel.letsDisplayTurnOff)
+	}
+
+	func testChangingDisplayOffSettingWhileActiveRefreshesAssertion() {
+		let viewModel = makeViewModel()
+
+		viewModel.start(duration: .forever)
+		viewModel.setLetsDisplayTurnOff(true)
+
+		XCTAssertTrue(viewModel.isActive)
+		XCTAssertEqual(sleepManager.allowSleepCallCount, 1)
+		XCTAssertEqual(sleepManager.preventSleepCallCount, 2)
+		XCTAssertEqual(sleepManager.displayBehaviors, [.keepDisplayAwake, .allowDisplayOff])
 	}
 	
 	func testStartTimedSessionShowsRemainingTimeAndCountsDown() {
@@ -152,7 +193,8 @@ final class WakeyViewModelTests: XCTestCase {
 			launchAtLoginManager: LaunchAtLoginManager(service: launchAtLoginService),
 			sleepManager: sleepManager,
 			notificationSender: notificationSender,
-			startsCountdownTimers: false
+			startsCountdownTimers: false,
+			defaults: viewModelDefaults
 		)
 	}
 	
@@ -173,9 +215,11 @@ private final class MockSleepManager: SleepManaging {
 	private(set) var isActive = false
 	private(set) var preventSleepCallCount = 0
 	private(set) var allowSleepCallCount = 0
+	private(set) var displayBehaviors: [SleepDisplayBehavior] = []
 	
-	func preventSleep(reason: String) -> Bool {
+	func preventSleep(displayBehavior: SleepDisplayBehavior, reason: String) -> Bool {
 		preventSleepCallCount += 1
+		displayBehaviors.append(displayBehavior)
 		isActive = true
 		return true
 	}

@@ -54,6 +54,9 @@ struct SettingsView: View {
 			
 			SettingsGroup {
 				launchAtLoginRow
+
+				SettingsDivider()
+				displayTurnOffRow
 				
 				if launchAtLoginManager.requiresApproval {
 					SettingsDivider()
@@ -93,6 +96,34 @@ struct SettingsView: View {
 			Toggle("", isOn: Binding(
 				get: { launchAtLoginManager.isEnabled },
 				set: { launchAtLoginManager.setEnabled($0) }
+			))
+			.labelsHidden()
+			.toggleStyle(.switch)
+		}
+		.padding(.horizontal, 14)
+		.padding(.vertical, 10)
+	}
+
+	private var displayTurnOffRow: some View {
+		HStack(spacing: 12) {
+			Image(systemName: "display")
+				.font(.system(size: 15, weight: .semibold))
+				.frame(width: 24, height: 24)
+
+			VStack(alignment: .leading, spacing: 2) {
+				Text("Let display turn off")
+					.font(.callout)
+
+				Text("Your Mac stays awake; the screen follows macOS display settings.")
+					.font(.caption)
+					.foregroundStyle(.secondary)
+			}
+
+			Spacer(minLength: 0)
+
+			Toggle("", isOn: Binding(
+				get: { viewModel.letsDisplayTurnOff },
+				set: { viewModel.setLetsDisplayTurnOff($0) }
 			))
 			.labelsHidden()
 			.toggleStyle(.switch)

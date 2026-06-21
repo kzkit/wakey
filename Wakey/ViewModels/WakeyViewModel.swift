@@ -12,6 +12,7 @@ import Combine
 final class WakeyViewModel: ObservableObject {
 	@Published private(set) var isActive = false
 	@Published private(set) var remainingSeconds: TimeInterval?
+	@Published private(set) var letsDisplayTurnOff: Bool
 	
 	let schedulerManager: SchedulerManager
 	let appMonitor: AppMonitor
@@ -19,9 +20,14 @@ final class WakeyViewModel: ObservableObject {
 	private let sleepManager: SleepManaging
 	private let notificationSender: NotificationSending
 	private let startsCountdownTimers: Bool
+	private let defaults: UserDefaults
 	private var timerCancellable: AnyCancellable?
 	private var cancellables = Set<AnyCancellable>()
 	private var manualTimerActive = false
+
+	private enum DefaultsKey {
+		static let letsDisplayTurnOff = "letsDisplayTurnOff"
+	}
 	
 	convenience init() {
 		self.init(
@@ -40,7 +46,8 @@ final class WakeyViewModel: ObservableObject {
 		launchAtLoginManager: LaunchAtLoginManager,
 		sleepManager: SleepManaging,
 		notificationSender: NotificationSending,
-		startsCountdownTimers: Bool
+		startsCountdownTimers: Bool,
+		defaults: UserDefaults = .standard
 	) {
 		self.schedulerManager = schedulerManager
 		self.appMonitor = appMonitor
@@ -48,6 +55,8 @@ final class WakeyViewModel: ObservableObject {
 		self.sleepManager = sleepManager
 		self.notificationSender = notificationSender
 		self.startsCountdownTimers = startsCountdownTimers
+		self.defaults = defaults
+		letsDisplayTurnOff = defaults.bool(forKey: DefaultsKey.letsDisplayTurnOff)
 		
 		schedulerManager.$isActive
 			.combineLatest(appMonitor.$isActive)
@@ -106,12 +115,25 @@ final class WakeyViewModel: ObservableObject {
 	func refreshState() {
 		updateSleepState()
 	}
+
+	func setLetsDisplayTurnOff(_ letsDisplayTurnOff: Bool) {
+		guard self.letsDisplayTurnOff != letsDisplayTurnOff else { return }
+
+		self.letsDisplayTurnOff = letsDisplayTurnOff
+		defaults.set(letsDisplayTurnOff, forKey: DefaultsKey.letsDisplayTurnOff)
+		updateSleepState(forceRefresh: true)
+	}
 	
-	private func updateSleepState() {
+	private func updateSleepState(forceRefresh: Bool = false) {
 		let shouldBeActive = manualTimerActive || schedulerManager.isActive || appMonitor.isActive
 		
-		if shouldBeActive && !sleepManager.isActive {
-			_ = sleepManager.preventSleep()
+		if shouldBeActive {
+			if sleepManager.isActive && forceRefresh {
+				sleepManager.allowSleep()
+			}
+			if !sleepManager.isActive {
+				_ = sleepManager.preventSleep(displayBehavior: sleepDisplayBehavior)
+			}
 		} else if !shouldBeActive && sleepManager.isActive {
 			sleepManager.allowSleep()
 		}
@@ -129,6 +151,10 @@ final class WakeyViewModel: ObservableObject {
 		}
 		
 		return L10n.string("Forever")
+	}
+
+	private var sleepDisplayBehavior: SleepDisplayBehavior {
+		letsDisplayTurnOff ? .allowDisplayOff : .keepDisplayAwake
 	}
 	
 	private func formattedStatusTime(_ remaining: TimeInterval) -> String {

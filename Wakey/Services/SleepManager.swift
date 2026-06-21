@@ -8,15 +8,23 @@
 import Foundation
 import IOKit.pwr_mgt
 
+enum SleepDisplayBehavior {
+	case keepDisplayAwake
+	case allowDisplayOff
+}
+
 protocol SleepManaging: AnyObject {
 	var isActive: Bool { get }
-	func preventSleep(reason: String) -> Bool
+	func preventSleep(displayBehavior: SleepDisplayBehavior, reason: String) -> Bool
 	func allowSleep()
 }
 
 extension SleepManaging {
-	func preventSleep() -> Bool {
-		preventSleep(reason: L10n.string("Wakey is keeping your Mac awake"))
+	func preventSleep(displayBehavior: SleepDisplayBehavior = .keepDisplayAwake) -> Bool {
+		preventSleep(
+			displayBehavior: displayBehavior,
+			reason: L10n.string("Wakey is keeping your Mac awake")
+		)
 	}
 }
 
@@ -25,11 +33,14 @@ final class SleepManager: SleepManaging {
 	private(set) var isActive: Bool = false
 	
 	/// Prevents system sleep. Returns success/failure.
-	func preventSleep(reason: String = L10n.string("Wakey is keeping your Mac awake")) -> Bool {
+	func preventSleep(
+		displayBehavior: SleepDisplayBehavior = .keepDisplayAwake,
+		reason: String = L10n.string("Wakey is keeping your Mac awake")
+	) -> Bool {
 		guard !isActive else { return true }
 		
 		let result = IOPMAssertionCreateWithName(
-			kIOPMAssertPreventUserIdleDisplaySleep as CFString,
+			displayBehavior.assertionType,
 			IOPMAssertionLevel(kIOPMAssertionLevelOn),
 			reason as CFString,
 			&assertionID
@@ -50,5 +61,16 @@ final class SleepManager: SleepManaging {
 	
 	deinit {
 		allowSleep()
+	}
+}
+
+private extension SleepDisplayBehavior {
+	var assertionType: CFString {
+		switch self {
+		case .keepDisplayAwake:
+			return kIOPMAssertPreventUserIdleDisplaySleep as CFString
+		case .allowDisplayOff:
+			return kIOPMAssertPreventUserIdleSystemSleep as CFString
+		}
 	}
 }
