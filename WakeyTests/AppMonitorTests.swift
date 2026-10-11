@@ -5,22 +5,17 @@ import XCTest
 @MainActor
 final class AppMonitorTests: XCTestCase {
 	private let watchedAppsKey = "watchedApps"
-	private var defaultsSuiteName: String!
 	private var defaults: UserDefaults!
 	private var applicationProvider: MockRunningApplicationProvider!
 	
 	override func setUp() {
 		super.setUp()
-		defaultsSuiteName = "WakeyTests.\(UUID().uuidString)"
-		defaults = UserDefaults(suiteName: defaultsSuiteName)
-		defaults.removePersistentDomain(forName: defaultsSuiteName)
+		defaults = makeTestDefaults()
 		applicationProvider = MockRunningApplicationProvider()
 	}
 	
 	override func tearDown() {
-		defaults.removePersistentDomain(forName: defaultsSuiteName)
 		defaults = nil
-		defaultsSuiteName = nil
 		applicationProvider = nil
 		super.tearDown()
 	}

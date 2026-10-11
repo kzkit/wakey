@@ -4,9 +4,6 @@ import XCTest
 
 @MainActor
 final class WakeyViewModelTests: XCTestCase {
-	private var schedulerDefaultsSuiteName: String!
-	private var appDefaultsSuiteName: String!
-	private var viewModelDefaultsSuiteName: String!
 	private var schedulerDefaults: UserDefaults!
 	private var appDefaults: UserDefaults!
 	private var viewModelDefaults: UserDefaults!
@@ -19,15 +16,9 @@ final class WakeyViewModelTests: XCTestCase {
 	
 	override func setUp() {
 		super.setUp()
-		schedulerDefaultsSuiteName = "WakeyTests.scheduler.\(UUID().uuidString)"
-		appDefaultsSuiteName = "WakeyTests.apps.\(UUID().uuidString)"
-		viewModelDefaultsSuiteName = "WakeyTests.viewModel.\(UUID().uuidString)"
-		schedulerDefaults = UserDefaults(suiteName: schedulerDefaultsSuiteName)
-		appDefaults = UserDefaults(suiteName: appDefaultsSuiteName)
-		viewModelDefaults = UserDefaults(suiteName: viewModelDefaultsSuiteName)
-		schedulerDefaults.removePersistentDomain(forName: schedulerDefaultsSuiteName)
-		appDefaults.removePersistentDomain(forName: appDefaultsSuiteName)
-		viewModelDefaults.removePersistentDomain(forName: viewModelDefaultsSuiteName)
+		schedulerDefaults = makeTestDefaults("scheduler")
+		appDefaults = makeTestDefaults("apps")
+		viewModelDefaults = makeTestDefaults("viewModel")
 		now = Self.date(hour: 10)
 		clockNow = ContinuousClock.now
 		runningApplications = MockRunningApplicationProvider()
@@ -37,15 +28,9 @@ final class WakeyViewModelTests: XCTestCase {
 	}
 	
 	override func tearDown() {
-		schedulerDefaults.removePersistentDomain(forName: schedulerDefaultsSuiteName)
-		appDefaults.removePersistentDomain(forName: appDefaultsSuiteName)
-		viewModelDefaults.removePersistentDomain(forName: viewModelDefaultsSuiteName)
 		schedulerDefaults = nil
 		appDefaults = nil
 		viewModelDefaults = nil
-		schedulerDefaultsSuiteName = nil
-		appDefaultsSuiteName = nil
-		viewModelDefaultsSuiteName = nil
 		now = nil
 		clockNow = nil
 		runningApplications = nil

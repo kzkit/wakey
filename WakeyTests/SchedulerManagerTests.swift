@@ -4,22 +4,17 @@ import XCTest
 @MainActor
 final class SchedulerManagerTests: XCTestCase {
 	private let scheduleKey = "schedule"
-	private var defaultsSuiteName: String!
 	private var defaults: UserDefaults!
 	private var now: Date!
 	
 	override func setUp() {
 		super.setUp()
-		defaultsSuiteName = "WakeyTests.\(UUID().uuidString)"
-		defaults = UserDefaults(suiteName: defaultsSuiteName)
-		defaults.removePersistentDomain(forName: defaultsSuiteName)
+		defaults = makeTestDefaults()
 		now = Self.date(hour: 10)
 	}
 	
 	override func tearDown() {
-		defaults.removePersistentDomain(forName: defaultsSuiteName)
 		defaults = nil
-		defaultsSuiteName = nil
 		now = nil
 		super.tearDown()
 	}
