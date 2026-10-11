@@ -51,11 +51,24 @@ final class SchedulerManager: ObservableObject {
 	}
 	
 	private func startMonitoring() {
-		timerCancellable = Timer.publish(every: 60, on: .main, in: .common)
-			.autoconnect()
-			.sink { [weak self] _ in
+		// Align the 60 s check to the start of each minute so half-hour boundaries are picked up within about a second.
+		timerCancellable = Just(())
+			.delay(for: .seconds(Self.delayUntilNextMinute(from: dateProvider())), scheduler: DispatchQueue.main)
+			.flatMap { _ in
+				Timer.publish(every: 60, on: .main, in: .common)
+					.autoconnect()
+					.map { _ in }
+					.prepend(())
+			}
+			.sink { [weak self] in
 				self?.checkSchedule()
 			}
+	}
+	
+	/// Seconds until just after the next wall-clock minute starts.
+	static func delayUntilNextMinute(from date: Date) -> TimeInterval {
+		let secondsIntoMinute = date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 60)
+		return 60 - secondsIntoMinute + 0.5
 	}
 	
 	private func checkSchedule() {

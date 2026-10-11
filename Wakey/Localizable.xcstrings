@@ -144,6 +144,34 @@
         }
       }
     },
+    "Active days" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aktive Tage"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Jours actifs"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "有効な曜日"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "生效日"
+          }
+        }
+      }
+    },
     "Active hours" : {
       "localizations" : {
         "de" : {
@@ -336,6 +364,34 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "选择让 Mac 保持唤醒的时长。"
+          }
+        }
+      }
+    },
+    "Choose at least one day, or the schedule won't run." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wähle mindestens einen Tag aus, sonst wird der Zeitplan nie aktiv."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choisissez au moins un jour, sinon la planification ne s’exécutera pas."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "曜日を1つ以上選択しないと、スケジュールは実行されません。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请至少选择一天，否则计划不会运行。"
           }
         }
       }

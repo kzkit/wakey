@@ -177,6 +177,9 @@ struct SettingsView: View {
 				
 				if schedule.isEnabled {
 					SettingsDivider()
+					activeDaysRow
+					
+					SettingsDivider()
 					activeHoursRow
 				}
 				
@@ -222,22 +225,77 @@ struct SettingsView: View {
 			Spacer(minLength: 0)
 			
 			HStack(spacing: 8) {
-				hourMenu(selectedHour: schedule.startHour) { selectedHour in
-					updateSchedule(startHour: selectedHour)
+				timeMenu(selectedMinute: schedule.startMinute) { selectedMinute in
+					updateSchedule(startMinute: selectedMinute)
 				}
 				
 				Text("to")
 					.font(.callout)
 					.foregroundStyle(.secondary)
 				
-				hourMenu(selectedHour: schedule.endHour) { selectedHour in
-					updateSchedule(endHour: selectedHour)
+				timeMenu(selectedMinute: schedule.endMinute) { selectedMinute in
+					updateSchedule(endMinute: selectedMinute)
 				}
 			}
 		}
 		.padding(.horizontal, 14)
 		.padding(.vertical, 10)
 		.transition(.opacity.combined(with: .move(edge: .top)))
+	}
+	
+	private var activeDaysRow: some View {
+		HStack(alignment: .top, spacing: 12) {
+			Image(systemName: "calendar")
+				.font(.system(size: 15, weight: .semibold))
+				.frame(width: 24, height: 24)
+			
+			VStack(alignment: .leading, spacing: 8) {
+				Text("Active days")
+					.font(.callout)
+					.frame(minHeight: 24)
+				
+				HStack(spacing: 6) {
+					ForEach(Schedule.orderedWeekdays(firstWeekday: Calendar.current.firstWeekday), id: \.self) { weekday in
+						weekdayChip(weekday)
+					}
+				}
+				
+				if schedule.weekdays.isEmpty {
+					Text("Choose at least one day, or the schedule won't run.")
+						.font(.caption)
+						.foregroundStyle(.orange)
+						.fixedSize(horizontal: false, vertical: true)
+				}
+			}
+			.frame(maxWidth: .infinity, alignment: .leading)
+		}
+		.padding(.horizontal, 14)
+		.padding(.vertical, 10)
+		.transition(.opacity.combined(with: .move(edge: .top)))
+	}
+	
+	private func weekdayChip(_ weekday: Int) -> some View {
+		let calendar = Calendar.current
+		let isSelected = schedule.weekdays.contains(weekday)
+		
+		return Button {
+			toggleWeekday(weekday)
+		} label: {
+			Text(calendar.shortStandaloneWeekdaySymbols[weekday - 1])
+				.font(.subheadline.weight(isSelected ? .semibold : .regular))
+				.lineLimit(1)
+				.foregroundStyle(isSelected ? Color.white : Color.primary)
+				.frame(maxWidth: .infinity, minHeight: 26)
+				.background(
+					Capsule(style: .continuous)
+						.fill(isSelected ? wakeyColor : Color.primary.opacity(0.06))
+				)
+				.contentShape(Capsule(style: .continuous))
+		}
+		.buttonStyle(.plain)
+		.accessibilityLabel(calendar.standaloneWeekdaySymbols[weekday - 1])
+		.accessibilityAddTraits(isSelected ? .isSelected : [])
+		.animation(.snappy(duration: 0.16), value: isSelected)
 	}
 	
 	private var scheduleActiveRow: some View {
@@ -341,23 +399,38 @@ struct SettingsView: View {
 	
 	private func updateSchedule(
 		isEnabled: Bool? = nil,
-		startHour: Int? = nil,
-		endHour: Int? = nil
+		startMinute: Int? = nil,
+		endMinute: Int? = nil,
+		weekdays: Set<Int>? = nil
 	) {
 		var updatedSchedule = schedule
 		if let isEnabled {
 			updatedSchedule.isEnabled = isEnabled
 		}
-		if let startHour {
-			updatedSchedule.startHour = startHour
+		if let startMinute {
+			updatedSchedule.startMinute = startMinute
 		}
-		if let endHour {
-			updatedSchedule.endHour = endHour
+		if let endMinute {
+			updatedSchedule.endMinute = endMinute
+		}
+		if let weekdays {
+			updatedSchedule.weekdays = weekdays
 		}
 		
 		schedule = updatedSchedule
 		viewModel.schedulerManager.updateSchedule(updatedSchedule)
 		viewModel.refreshState()
+	}
+	
+	private func toggleWeekday(_ weekday: Int) {
+		var weekdays = schedule.weekdays
+		if weekdays.contains(weekday) {
+			weekdays.remove(weekday)
+		} else {
+			weekdays.insert(weekday)
+		}
+		
+		updateSchedule(weekdays: weekdays)
 	}
 	
 	private func toggleWatchedApp(bundleIdentifier: String, isWatched: Bool) {
@@ -372,16 +445,16 @@ struct SettingsView: View {
 		refreshListedApps()
 	}
 	
-	private func hourMenu(selectedHour: Int, onSelect: @escaping (Int) -> Void) -> some View {
+	private func timeMenu(selectedMinute: Int, onSelect: @escaping (Int) -> Void) -> some View {
 		Menu {
-			ForEach(0..<24, id: \.self) { hour in
-				Button(String(format: "%02d:00", hour)) {
-					onSelect(hour)
+			ForEach(Schedule.selectableMinutes, id: \.self) { minute in
+				Button(timeLabel(minute)) {
+					onSelect(minute)
 				}
 			}
 		} label: {
 			HStack(spacing: 6) {
-				Text(String(format: "%02d:00", selectedHour))
+				Text(timeLabel(selectedMinute))
 					.monospacedDigit()
 				
 				Image(systemName: "chevron.up.chevron.down")
@@ -396,6 +469,10 @@ struct SettingsView: View {
 			)
 		}
 		.menuStyle(.borderlessButton)
+	}
+	
+	private func timeLabel(_ minute: Int) -> String {
+		String(format: "%02d:%02d", minute / 60, minute % 60)
 	}
 	
 	private var categorizedApps: (watched: [InstalledApp], available: [InstalledApp], isEmpty: Bool) {

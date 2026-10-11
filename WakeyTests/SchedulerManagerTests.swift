@@ -74,6 +74,34 @@ final class SchedulerManagerTests: XCTestCase {
 		XCTAssertFalse(manager.isActive)
 	}
 	
+	func testLoadsScheduleSavedByEarlierVersionsAsEveryDay() {
+		defaults.set(Data(#"{"isEnabled":true,"startHour":9,"endHour":17}"#.utf8), forKey: scheduleKey)
+
+		let manager = makeManager()
+
+		XCTAssertEqual(manager.currentSchedule, Schedule(isEnabled: true, startHour: 9, endHour: 17, weekdays: Schedule.allWeekdays))
+		XCTAssertTrue(manager.isActive)
+	}
+
+	func testScheduleIsInactiveOnUnselectedWeekday() {
+		let manager = makeManager()
+		let weekday = Calendar.current.component(.weekday, from: now)
+
+		manager.updateSchedule(Schedule(isEnabled: true, startHour: 9, endHour: 17, weekdays: Schedule.allWeekdays.subtracting([weekday])))
+		XCTAssertFalse(manager.isActive)
+
+		manager.updateSchedule(Schedule(isEnabled: true, startHour: 9, endHour: 17, weekdays: [weekday]))
+		XCTAssertTrue(manager.isActive)
+	}
+
+	func testDelayUntilNextMinuteLandsJustAfterTheMinuteBoundary() {
+		let minuteStart = Date(timeIntervalSinceReferenceDate: 60 * 1_000_000)
+
+		XCTAssertEqual(SchedulerManager.delayUntilNextMinute(from: minuteStart.addingTimeInterval(15)), 45.5, accuracy: 0.001)
+		XCTAssertEqual(SchedulerManager.delayUntilNextMinute(from: minuteStart.addingTimeInterval(59.9)), 0.6, accuracy: 0.001)
+		XCTAssertEqual(SchedulerManager.delayUntilNextMinute(from: minuteStart), 60.5, accuracy: 0.001)
+	}
+
 	private func makeManager() -> SchedulerManager {
 		SchedulerManager(defaults: defaults, dateProvider: { self.now }, startsMonitoring: false)
 	}
