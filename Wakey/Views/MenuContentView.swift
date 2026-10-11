@@ -12,6 +12,7 @@ struct MenuContentView: View {
 	@ObservedObject var viewModel: WakeyViewModel
 	@ObservedObject private var softwareUpdateManager = SoftwareUpdateManager.shared
 	@Environment(\.dismiss) private var dismiss
+	@State private var pendingBatteryStart: PendingBatteryStart?
 	
 	var body: some View {
 		VStack(alignment: .leading, spacing: 0) {
@@ -26,6 +27,9 @@ struct MenuContentView: View {
 					activeControl
 					menuDivider
 				}
+			} else if let pendingBatteryStart {
+				batteryConfirmation(for: pendingBatteryStart)
+				menuDivider
 			} else {
 				timerSection
 				menuDivider
@@ -36,6 +40,9 @@ struct MenuContentView: View {
 		.padding(.vertical, 14)
 		.frame(width: 300)
 		.background(.regularMaterial)
+		.onDisappear {
+			pendingBatteryStart = nil
+		}
 	}
 	
 	private var header: some View {
@@ -58,8 +65,8 @@ struct MenuContentView: View {
 			NativeMenuRow(
 				title: statusTitle,
 				detail: statusDetail,
-				systemImage: viewModel.isActive ? "bolt.fill" : "moon.zzz.fill",
-				tint: viewModel.isActive ? .yellow : .secondary
+				systemImage: statusSystemImage,
+				tint: statusTint
 			)
 		}
 	}
@@ -93,12 +100,40 @@ struct MenuContentView: View {
 					systemImage: duration == .forever ? "infinity" : "timer",
 					tint: .primary,
 					action: {
-						performAndDismissMenu {
+						requestStart {
 							viewModel.start(duration: duration)
 						}
 					}
 				)
 			}
+		}
+	}
+	
+	private func batteryConfirmation(for pendingStart: PendingBatteryStart) -> some View {
+		VStack(alignment: .leading, spacing: 10) {
+			NativeMenuRow(
+				title: L10n.string("Stay awake anyway?"),
+				detail: (viewModel.batteryGuardReason ?? pendingStart.reason).message,
+				systemImage: "battery.25",
+				tint: .orange
+			)
+			
+			HStack(spacing: 8) {
+				Spacer(minLength: 0)
+				
+				Button(L10n.string("Cancel")) {
+					pendingBatteryStart = nil
+				}
+				.keyboardShortcut(.cancelAction)
+				
+				Button(L10n.string("Stay Awake")) {
+					pendingBatteryStart = nil
+					performAndDismissMenu(pendingStart.start)
+				}
+				.keyboardShortcut(.defaultAction)
+				.buttonStyle(.borderedProminent)
+			}
+			.padding(.horizontal, 16)
 		}
 	}
 	
@@ -151,6 +186,10 @@ struct MenuContentView: View {
 	}
 	
 	private var statusTitle: String {
+		if !viewModel.isActive && viewModel.isPausedForLowBattery {
+			return L10n.string("Paused — low battery")
+		}
+		
 		guard viewModel.isActive else {
 			return L10n.string("Inactive")
 		}
@@ -163,11 +202,31 @@ struct MenuContentView: View {
 	}
 	
 	private var statusDetail: String? {
+		if !viewModel.isActive && viewModel.isPausedForLowBattery {
+			return viewModel.batteryGuardReason?.message
+		}
+		
 		guard viewModel.isActive else {
 			return L10n.string("Choose a duration to keep your Mac awake.")
 		}
 		
 		return viewModel.statusText
+	}
+	
+	private var statusSystemImage: String {
+		if viewModel.isActive {
+			return "bolt.fill"
+		}
+		
+		return viewModel.isPausedForLowBattery ? "battery.25" : "moon.zzz.fill"
+	}
+	
+	private var statusTint: Color {
+		if viewModel.isActive {
+			return .yellow
+		}
+		
+		return viewModel.isPausedForLowBattery ? .orange : .secondary
 	}
 	
 	private func sectionTitle(_ title: String) -> some View {
@@ -185,6 +244,22 @@ struct MenuContentView: View {
 		action()
 		dismiss()
 	}
+	
+	/// Gate for every manual start: while the battery guard applies, ask inside the menu first.
+	/// The start is passed in, so any start button can share it, and a start the user confirms is exempt from the guard.
+	private func requestStart(_ start: @escaping () -> Void) {
+		guard let reason = viewModel.batteryGuardReason else {
+			performAndDismissMenu(start)
+			return
+		}
+		
+		pendingBatteryStart = PendingBatteryStart(reason: reason, start: start)
+	}
+}
+
+private struct PendingBatteryStart {
+	let reason: BatteryGuardReason
+	let start: () -> Void
 }
 
 private struct FooterMenuRowButton: View {

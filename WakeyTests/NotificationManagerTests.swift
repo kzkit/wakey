@@ -35,6 +35,31 @@ final class NotificationManagerTests: XCTestCase {
 		let request = try XCTUnwrap(center.addedRequests.first)
 		XCTAssertEqual(request.content.body, "Timer ended. A schedule or watched app is still keeping your Mac awake.")
 	}
+
+	func testSendBatteryGuardStoppedNotificationMentionsBatteryLevel() throws {
+		let center = MockUserNotificationCenter()
+		let manager = NotificationManager(notificationCenter: center)
+
+		manager.sendBatteryGuardStoppedNotification(reason: .batteryLevel(19))
+
+		let request = try XCTUnwrap(center.addedRequests.first)
+		XCTAssertFalse(request.identifier.isEmpty)
+		XCTAssertEqual(request.content.title, "Wakey stopped")
+		XCTAssertEqual(request.content.body, "Battery is at 19%. Your Mac can sleep normally.")
+		XCTAssertEqual(request.content.sound, .default)
+		XCTAssertNil(request.trigger)
+	}
+
+	func testSendBatteryGuardStoppedNotificationMentionsLowPowerMode() throws {
+		let center = MockUserNotificationCenter()
+		let manager = NotificationManager(notificationCenter: center)
+
+		manager.sendBatteryGuardStoppedNotification(reason: .lowPowerMode)
+
+		let request = try XCTUnwrap(center.addedRequests.first)
+		XCTAssertEqual(request.content.title, "Wakey stopped")
+		XCTAssertEqual(request.content.body, "Low Power Mode turned on. Your Mac can sleep normally.")
+	}
 }
 
 private final class MockUserNotificationCenter: UserNotificationCentering {
