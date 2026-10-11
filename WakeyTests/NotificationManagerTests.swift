@@ -16,7 +16,7 @@ final class NotificationManagerTests: XCTestCase {
 		let center = MockUserNotificationCenter()
 		let manager = NotificationManager(notificationCenter: center)
 		
-		manager.sendTimerEndedNotification()
+		manager.sendTimerEndedNotification(isStillAwake: false)
 		
 		let request = try XCTUnwrap(center.addedRequests.first)
 		XCTAssertFalse(request.identifier.isEmpty)
@@ -24,6 +24,16 @@ final class NotificationManagerTests: XCTestCase {
 		XCTAssertEqual(request.content.body, "Timer ended. Your Mac can sleep now.")
 		XCTAssertEqual(request.content.sound, .default)
 		XCTAssertNil(request.trigger)
+	}
+	
+	func testSendTimerEndedNotificationMentionsWhenMacIsStillAwake() throws {
+		let center = MockUserNotificationCenter()
+		let manager = NotificationManager(notificationCenter: center)
+		
+		manager.sendTimerEndedNotification(isStillAwake: true)
+		
+		let request = try XCTUnwrap(center.addedRequests.first)
+		XCTAssertEqual(request.content.body, "Timer ended. A schedule or watched app is still keeping your Mac awake.")
 	}
 }
 

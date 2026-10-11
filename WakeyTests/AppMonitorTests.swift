@@ -1,3 +1,4 @@
+import Combine
 import XCTest
 @testable import Wakey
 
@@ -60,7 +61,20 @@ final class AppMonitorTests: XCTestCase {
 		
 		XCTAssertTrue(monitor.isActive)
 	}
-	
+
+	func testRecheckingUnchangedAppsDoesNotPublishChanges() {
+		applicationProvider.runningApplicationBundleIdentifiers = ["com.example.Editor"]
+		let monitor = makeMonitor()
+		monitor.setWatchedApps(["com.example.Editor"])
+		var changeCount = 0
+		let cancellable = monitor.objectWillChange.sink { changeCount += 1 }
+
+		monitor.setWatchedApps(["com.example.Editor"])
+
+		XCTAssertEqual(changeCount, 0)
+		cancellable.cancel()
+	}
+
 	private func makeMonitor() -> AppMonitor {
 		AppMonitor(defaults: defaults, applicationProvider: applicationProvider, startsMonitoring: false)
 	}

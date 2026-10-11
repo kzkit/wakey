@@ -15,8 +15,14 @@ final class SettingsWindowCoordinator {
 	private var pendingRaiseAttempts = 0
 	private var settingsWindowTitle: String { L10n.string("Settings") }
 	private var restoreWindowLevelWorkItem: DispatchWorkItem?
+	private var openSettingsAction: (() -> Void)?
 	
 	private init() {}
+	
+	/// macOS 14+ ignores `showSettingsWindow:`, so the Settings scene has to be opened through SwiftUI's `openSettings`.
+	func setOpenSettingsAction(_ action: @escaping () -> Void) {
+		openSettingsAction = action
+	}
 	
 	func openSettingsWindow() {
 		NSApp.activate(ignoringOtherApps: true)
@@ -26,7 +32,7 @@ final class SettingsWindowCoordinator {
 			return
 		}
 		
-		NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
+		openSettingsAction?()
 		scheduleRaiseAttempts()
 	}
 	

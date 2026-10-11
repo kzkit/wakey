@@ -1,3 +1,4 @@
+import Combine
 import XCTest
 @testable import Wakey
 
@@ -10,6 +11,7 @@ final class WakeyViewModelTests: XCTestCase {
 	private var appDefaults: UserDefaults!
 	private var viewModelDefaults: UserDefaults!
 	private var now: Date!
+	private var clockNow: ContinuousClock.Instant!
 	private var runningApplications: MockRunningApplicationProvider!
 	private var launchAtLoginService: MockViewModelLaunchAtLoginService!
 	private var sleepManager: MockSleepManager!
@@ -27,6 +29,7 @@ final class WakeyViewModelTests: XCTestCase {
 		appDefaults.removePersistentDomain(forName: appDefaultsSuiteName)
 		viewModelDefaults.removePersistentDomain(forName: viewModelDefaultsSuiteName)
 		now = Self.date(hour: 10)
+		clockNow = ContinuousClock.now
 		runningApplications = MockRunningApplicationProvider()
 		launchAtLoginService = MockViewModelLaunchAtLoginService()
 		sleepManager = MockSleepManager()
@@ -44,6 +47,7 @@ final class WakeyViewModelTests: XCTestCase {
 		appDefaultsSuiteName = nil
 		viewModelDefaultsSuiteName = nil
 		now = nil
+		clockNow = nil
 		runningApplications = nil
 		launchAtLoginService = nil
 		sleepManager = nil
@@ -116,7 +120,7 @@ final class WakeyViewModelTests: XCTestCase {
 		let viewModel = makeViewModel()
 		
 		viewModel.start(duration: .oneMinute)
-		viewModel.advanceCountdownForTesting()
+		advanceCountdown(of: viewModel, by: 1)
 		
 		XCTAssertTrue(viewModel.isActive)
 		XCTAssertEqual(viewModel.remainingSeconds, 59)
@@ -129,14 +133,104 @@ final class WakeyViewModelTests: XCTestCase {
 		
 		viewModel.start(duration: .oneMinute)
 		for _ in 0..<60 {
-			viewModel.advanceCountdownForTesting()
+			advanceCountdown(of: viewModel, by: 1)
 		}
 		
 		XCTAssertFalse(viewModel.isActive)
 		XCTAssertFalse(viewModel.canStop)
 		XCTAssertNil(viewModel.remainingSeconds)
 		XCTAssertEqual(notificationSender.timerEndedCallCount, 1)
+		XCTAssertEqual(notificationSender.lastIsStillAwake, false)
 		XCTAssertEqual(sleepManager.allowSleepCallCount, 1)
+	}
+	
+	func testCountdownFollowsWallClockWhenTicksAreDelayed() {
+		let viewModel = makeViewModel()
+		
+		viewModel.start(duration: .oneMinute)
+		advanceCountdown(of: viewModel, by: 19)
+		
+		XCTAssertEqual(viewModel.remainingSeconds, 41)
+		XCTAssertEqual(viewModel.statusText, "0:41")
+	}
+	
+	func testCountdownIgnoresWallClockMovingBackwards() {
+		let viewModel = makeViewModel()
+		
+		viewModel.start(duration: .tenMinutes)
+		advanceCountdown(of: viewModel, by: 60)
+		now = now.addingTimeInterval(-3600)
+		viewModel.advanceCountdownForTesting()
+		
+		XCTAssertEqual(viewModel.remainingSeconds, 540)
+	}
+	
+	func testCountdownEndsOnFirstTickAfterDeadlinePasses() {
+		let viewModel = makeViewModel()
+		
+		viewModel.start(duration: .fiveMinutes)
+		advanceCountdown(of: viewModel, by: 600)
+		
+		XCTAssertFalse(viewModel.isActive)
+		XCTAssertNil(viewModel.remainingSeconds)
+		XCTAssertEqual(notificationSender.timerEndedCallCount, 1)
+	}
+	
+	func testCountdownEndingWhileScheduleIsActiveReportsMacIsStillAwake() {
+		let scheduler = makeSchedulerManager()
+		let appMonitor = makeAppMonitor()
+		let viewModel = makeViewModel(schedulerManager: scheduler, appMonitor: appMonitor)
+		
+		viewModel.start(duration: .oneMinute)
+		scheduler.updateSchedule(Schedule(isEnabled: true, startHour: 9, endHour: 17))
+		advanceCountdown(of: viewModel, by: 60)
+		
+		XCTAssertTrue(viewModel.isActive)
+		XCTAssertFalse(viewModel.canStop)
+		XCTAssertEqual(notificationSender.timerEndedCallCount, 1)
+		XCTAssertEqual(notificationSender.lastIsStillAwake, true)
+	}
+	
+	func testFailedSleepAssertionLeavesWakeyInactive() {
+		sleepManager.failsToPreventSleep = true
+		let viewModel = makeViewModel()
+		
+		viewModel.start(duration: .forever)
+		
+		XCTAssertFalse(viewModel.isActive)
+		XCTAssertFalse(viewModel.canStop)
+		XCTAssertEqual(viewModel.statusText, "Inactive")
+	}
+	
+	func testSwitchingActiveSourcePublishesStatusChange() {
+		let scheduler = makeSchedulerManager()
+		let appMonitor = makeAppMonitor()
+		let viewModel = makeViewModel(schedulerManager: scheduler, appMonitor: appMonitor)
+		runningApplications.runningApplicationBundleIdentifiers = ["com.example.Editor"]
+		appMonitor.setWatchedApps(["com.example.Editor"])
+		XCTAssertEqual(viewModel.statusText, "App running")
+		var changeCount = 0
+		let cancellable = viewModel.objectWillChange.sink { changeCount += 1 }
+		
+		scheduler.updateSchedule(Schedule(isEnabled: true, startHour: 9, endHour: 17))
+		
+		XCTAssertTrue(viewModel.isActive)
+		XCTAssertEqual(viewModel.statusText, "Scheduled run")
+		XCTAssertGreaterThan(changeCount, 0)
+		cancellable.cancel()
+	}
+	
+	func testRefreshingUnchangedStateDoesNotPublishChanges() {
+		let viewModel = makeViewModel()
+		viewModel.start(duration: .forever)
+		var changeCount = 0
+		let cancellable = viewModel.objectWillChange.sink { changeCount += 1 }
+		
+		viewModel.refreshState()
+		viewModel.refreshState()
+		
+		XCTAssertEqual(changeCount, 0)
+		cancellable.cancel()
 	}
 	
 	func testScheduleActivationPreventsSleepAndUsesScheduleStatus() {
@@ -194,8 +288,14 @@ final class WakeyViewModelTests: XCTestCase {
 			sleepManager: sleepManager,
 			notificationSender: notificationSender,
 			startsCountdownTimers: false,
-			defaults: viewModelDefaults
+			defaults: viewModelDefaults,
+			now: { self.clockNow }
 		)
+	}
+	
+	private func advanceCountdown(of viewModel: WakeyViewModel, by seconds: TimeInterval) {
+		clockNow = clockNow.advanced(by: .seconds(seconds))
+		viewModel.advanceCountdownForTesting()
 	}
 	
 	private func makeSchedulerManager() -> SchedulerManager {
@@ -216,12 +316,13 @@ private final class MockSleepManager: SleepManaging {
 	private(set) var preventSleepCallCount = 0
 	private(set) var allowSleepCallCount = 0
 	private(set) var displayBehaviors: [SleepDisplayBehavior] = []
+	var failsToPreventSleep = false
 	
 	func preventSleep(displayBehavior: SleepDisplayBehavior, reason: String) -> Bool {
 		preventSleepCallCount += 1
 		displayBehaviors.append(displayBehavior)
-		isActive = true
-		return true
+		isActive = !failsToPreventSleep
+		return isActive
 	}
 	
 	func allowSleep() {
@@ -241,13 +342,15 @@ private final class MockViewModelLaunchAtLoginService: LaunchAtLoginServicing {
 private final class MockNotificationSender: NotificationSending {
 	private(set) var requestAuthorizationCallCount = 0
 	private(set) var timerEndedCallCount = 0
+	private(set) var lastIsStillAwake: Bool?
 	
 	func requestAuthorization() {
 		requestAuthorizationCallCount += 1
 	}
 	
-	func sendTimerEndedNotification() {
+	func sendTimerEndedNotification(isStillAwake: Bool) {
 		timerEndedCallCount += 1
+		lastIsStillAwake = isStillAwake
 	}
 }
 
