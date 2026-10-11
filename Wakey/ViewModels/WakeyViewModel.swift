@@ -64,8 +64,11 @@ final class WakeyViewModel: ObservableObject {
 		
 		schedulerManager.$isActive
 			.combineLatest(appMonitor.$isActive)
-			.sink { [weak self] _, _ in
-				self?.updateSleepState()
+			.sink { [weak self] isScheduleActive, isAppActive in
+				// `@Published` emits before the new value is stored, so use the emitted values instead of reading the managers.
+				// The status text also depends on which source is active, so publish even when `isActive` itself doesn't change.
+				self?.objectWillChange.send()
+				self?.updateSleepState(isScheduleActive: isScheduleActive, isAppActive: isAppActive)
 			}
 			.store(in: &cancellables)
 	}
@@ -139,8 +142,14 @@ final class WakeyViewModel: ObservableObject {
 		updateSleepState(forceRefresh: true)
 	}
 	
-	private func updateSleepState(forceRefresh: Bool = false) {
-		let shouldBeActive = manualTimerActive || schedulerManager.isActive || appMonitor.isActive
+	private func updateSleepState(
+		forceRefresh: Bool = false,
+		isScheduleActive: Bool? = nil,
+		isAppActive: Bool? = nil
+	) {
+		let shouldBeActive = manualTimerActive
+			|| (isScheduleActive ?? schedulerManager.isActive)
+			|| (isAppActive ?? appMonitor.isActive)
 		
 		if shouldBeActive {
 			if sleepManager.isActive && forceRefresh {

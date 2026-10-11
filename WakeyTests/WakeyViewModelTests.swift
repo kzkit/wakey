@@ -202,6 +202,24 @@ final class WakeyViewModelTests: XCTestCase {
 		XCTAssertEqual(viewModel.statusText, "Inactive")
 	}
 	
+	func testSwitchingActiveSourcePublishesStatusChange() {
+		let scheduler = makeSchedulerManager()
+		let appMonitor = makeAppMonitor()
+		let viewModel = makeViewModel(schedulerManager: scheduler, appMonitor: appMonitor)
+		runningApplications.runningApplicationBundleIdentifiers = ["com.example.Editor"]
+		appMonitor.setWatchedApps(["com.example.Editor"])
+		XCTAssertEqual(viewModel.statusText, "App running")
+		var changeCount = 0
+		let cancellable = viewModel.objectWillChange.sink { changeCount += 1 }
+		
+		scheduler.updateSchedule(Schedule(isEnabled: true, startHour: 9, endHour: 17))
+		
+		XCTAssertTrue(viewModel.isActive)
+		XCTAssertEqual(viewModel.statusText, "Scheduled run")
+		XCTAssertGreaterThan(changeCount, 0)
+		cancellable.cancel()
+	}
+	
 	func testRefreshingUnchangedStateDoesNotPublishChanges() {
 		let viewModel = makeViewModel()
 		viewModel.start(duration: .forever)
