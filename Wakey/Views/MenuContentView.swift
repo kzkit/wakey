@@ -40,7 +40,7 @@ struct MenuContentView: View {
 		}
 		.padding(.vertical, 14)
 		.frame(width: 300)
-		.background(.regularMaterial)
+		.windowContentBackground()
 		.onDisappear {
 			pendingBatteryStart = nil
 		}
@@ -155,20 +155,23 @@ struct MenuContentView: View {
 				tint: .orange
 			)
 			
-			HStack(spacing: 8) {
-				Spacer(minLength: 0)
-				
-				Button(L10n.string("Cancel")) {
-					pendingBatteryStart = nil
+			GlassGroup {
+				HStack(spacing: 8) {
+					Spacer(minLength: 0)
+					
+					Button(L10n.string("Cancel")) {
+						pendingBatteryStart = nil
+					}
+					.keyboardShortcut(.cancelAction)
+					.secondaryActionButtonStyle()
+					
+					Button(L10n.string("Stay Awake")) {
+						pendingBatteryStart = nil
+						performAndDismissMenu(pendingStart.start)
+					}
+					.keyboardShortcut(.defaultAction)
+					.primaryActionButtonStyle()
 				}
-				.keyboardShortcut(.cancelAction)
-				
-				Button(L10n.string("Stay Awake")) {
-					pendingBatteryStart = nil
-					performAndDismissMenu(pendingStart.start)
-				}
-				.keyboardShortcut(.defaultAction)
-				.buttonStyle(.borderedProminent)
 			}
 			.padding(.horizontal, 16)
 		}
@@ -402,11 +405,7 @@ private struct NativeRowButtonStyle: ButtonStyle {
 		
 		var body: some View {
 			configuration.label
-				.background(
-					RoundedRectangle(cornerRadius: 12, style: .continuous)
-						.fill(backgroundColor)
-						.padding(.horizontal, 8)
-				)
+				.rowHighlight(backgroundColor, cornerRadius: 12, horizontalInset: 8)
 				.scaleEffect(configuration.isPressed ? 0.985 : 1)
 				.animation(.snappy(duration: 0.14), value: configuration.isPressed)
 				.animation(.easeInOut(duration: 0.12), value: isHovered)
@@ -415,10 +414,10 @@ private struct NativeRowButtonStyle: ButtonStyle {
 		
 		private var backgroundColor: Color {
 			if configuration.isPressed {
-				return Color.primary.opacity(0.12)
+				return SystemFill.primary.color(fallbackOpacity: 0.12)
 			}
 			
-			return isHovered ? Color.primary.opacity(0.08) : .clear
+			return isHovered ? SystemFill.secondary.color(fallbackOpacity: 0.08) : .clear
 		}
 	}
 }

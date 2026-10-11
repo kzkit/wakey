@@ -38,7 +38,7 @@ struct SettingsView: View {
 			}
 		}
 		.frame(width: 460, height: 560)
-		.background(.regularMaterial)
+		.windowContentBackground()
 		.background(SettingsWindowAccessor())
 		.onAppear {
 			syncSavedValues()
@@ -188,29 +188,13 @@ struct SettingsView: View {
 
 			Spacer(minLength: 0)
 
-			Menu {
+			ValueMenu(title: L10n.format("%lld%%", viewModel.batteryGuardThreshold)) {
 				ForEach(BatteryGuard.thresholdOptions, id: \.self) { threshold in
 					Button(L10n.format("%lld%%", threshold)) {
 						viewModel.setBatteryGuardThreshold(threshold)
 					}
 				}
-			} label: {
-				HStack(spacing: 6) {
-					Text(L10n.format("%lld%%", viewModel.batteryGuardThreshold))
-						.monospacedDigit()
-
-					Image(systemName: "chevron.up.chevron.down")
-						.font(.caption2.weight(.semibold))
-						.foregroundStyle(.secondary)
-				}
-				.padding(.horizontal, 9)
-				.padding(.vertical, 5)
-				.background(
-					RoundedRectangle(cornerRadius: 7, style: .continuous)
-						.fill(Color.primary.opacity(0.06))
-				)
 			}
-			.menuStyle(.borderlessButton)
 			.fixedSize()
 		}
 		.padding(.horizontal, 14)
@@ -311,6 +295,8 @@ struct SettingsView: View {
 				Text("to")
 					.font(.callout)
 					.foregroundStyle(.secondary)
+					// The system menu buttons on macOS 26+ otherwise squeeze this label to nothing.
+					.fixedSize()
 				
 				timeMenu(selectedMinute: schedule.endMinute) { selectedMinute in
 					updateSchedule(endMinute: selectedMinute)
@@ -333,9 +319,12 @@ struct SettingsView: View {
 					.font(.callout)
 					.frame(minHeight: 24)
 				
-				HStack(spacing: 6) {
-					ForEach(Schedule.orderedWeekdays(firstWeekday: Calendar.current.firstWeekday), id: \.self) { weekday in
-						weekdayChip(weekday)
+				// Zero spacing keeps neighbouring chips from melting into each other at rest.
+				GlassGroup(spacing: 0) {
+					HStack(spacing: 6) {
+						ForEach(Schedule.orderedWeekdays(firstWeekday: Calendar.current.firstWeekday), id: \.self) { weekday in
+							weekdayChip(weekday)
+						}
 					}
 				}
 				
@@ -363,12 +352,8 @@ struct SettingsView: View {
 			Text(calendar.shortStandaloneWeekdaySymbols[weekday - 1])
 				.font(.subheadline.weight(isSelected ? .semibold : .regular))
 				.lineLimit(1)
-				.foregroundStyle(isSelected ? Color.white : Color.primary)
 				.frame(maxWidth: .infinity, minHeight: 26)
-				.background(
-					Capsule(style: .continuous)
-						.fill(isSelected ? wakeyColor : Color.primary.opacity(0.06))
-				)
+				.chipStyle(isSelected: isSelected, tint: wakeyColor)
 				.contentShape(Capsule(style: .continuous))
 		}
 		.buttonStyle(.plain)
@@ -527,29 +512,13 @@ struct SettingsView: View {
 	}
 	
 	private func timeMenu(selectedMinute: Int, onSelect: @escaping (Int) -> Void) -> some View {
-		Menu {
+		ValueMenu(title: timeLabel(selectedMinute)) {
 			ForEach(Schedule.selectableMinutes, id: \.self) { minute in
 				Button(timeLabel(minute)) {
 					onSelect(minute)
 				}
 			}
-		} label: {
-			HStack(spacing: 6) {
-				Text(timeLabel(selectedMinute))
-					.monospacedDigit()
-				
-				Image(systemName: "chevron.up.chevron.down")
-					.font(.caption2.weight(.semibold))
-					.foregroundStyle(.secondary)
-			}
-			.padding(.horizontal, 9)
-			.padding(.vertical, 5)
-			.background(
-				RoundedRectangle(cornerRadius: 7, style: .continuous)
-					.fill(Color.primary.opacity(0.06))
-			)
 		}
-		.menuStyle(.borderlessButton)
 	}
 	
 	private func timeLabel(_ minute: Int) -> String {
@@ -692,11 +661,46 @@ private struct SettingsGroup<Content: View>: View {
 		VStack(spacing: 0) {
 			content
 		}
-		.background(
-			RoundedRectangle(cornerRadius: 14, style: .continuous)
-				.fill(Color.primary.opacity(0.045))
-		)
-		.clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+		.groupBackground(cornerRadius: 14, fallbackOpacity: 0.045)
+	}
+}
+
+/// A compact menu showing the selected value. On macOS 26+ it's the system menu button, which draws its own bezel
+/// and indicator; a borderless menu there drops the hand-drawn pill and shows the chevron next to the system one.
+private struct ValueMenu<Items: View>: View {
+	let title: String
+	@ViewBuilder let items: Items
+	
+	var body: some View {
+		if #available(macOS 26.0, *) {
+			Menu {
+				items
+			} label: {
+				Text(title)
+					.monospacedDigit()
+			}
+			.fixedSize()
+		} else {
+			Menu {
+				items
+			} label: {
+				HStack(spacing: 6) {
+					Text(title)
+						.monospacedDigit()
+					
+					Image(systemName: "chevron.up.chevron.down")
+						.font(.caption2.weight(.semibold))
+						.foregroundStyle(.secondary)
+				}
+				.padding(.horizontal, 9)
+				.padding(.vertical, 5)
+				.background(
+					RoundedRectangle(cornerRadius: 7, style: .continuous)
+						.fill(Color.primary.opacity(0.06))
+				)
+			}
+			.menuStyle(.borderlessButton)
+		}
 	}
 }
 
@@ -735,12 +739,8 @@ private struct AppSelectionRow: View {
 			.padding(.horizontal, 14)
 			.padding(.vertical, 9)
 			.frame(maxWidth: .infinity, alignment: .leading)
-			.background(
-				RoundedRectangle(cornerRadius: 10, style: .continuous)
-					.fill(rowBackground)
-					.padding(.horizontal, 6)
-					.padding(.vertical, 3)
-			)
+			// On macOS 26+ the highlight is concentric with the group (its 14 pt radius minus the 6 pt inset).
+			.rowHighlight(rowBackground, cornerRadius: 10, minimumConcentricRadius: 8, horizontalInset: 6, verticalInset: 3)
 			.contentShape(Rectangle())
 		}
 		.buttonStyle(.plain)
@@ -768,7 +768,7 @@ private struct AppSelectionRow: View {
 			return accentColor.opacity(isHovered ? 0.16 : 0.11)
 		}
 		
-		return isHovered ? Color.primary.opacity(0.07) : .clear
+		return isHovered ? SystemFill.secondary.color(fallbackOpacity: 0.07) : .clear
 	}
 }
 

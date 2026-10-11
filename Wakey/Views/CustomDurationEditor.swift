@@ -57,14 +57,17 @@ struct CustomDurationEditor: View {
 				Spacer(minLength: 0)
 			}
 			
-			HStack(spacing: 8) {
-				Spacer(minLength: 0)
-				
-				Button(L10n.string("Cancel"), action: onCancel)
-				
-				Button(L10n.string("Start"), action: start)
-					.buttonStyle(.borderedProminent)
-					.disabled(totalMinutes == nil)
+			GlassGroup {
+				HStack(spacing: 8) {
+					Spacer(minLength: 0)
+					
+					Button(L10n.string("Cancel"), action: onCancel)
+						.secondaryActionButtonStyle()
+					
+					Button(L10n.string("Start"), action: start)
+						.primaryActionButtonStyle()
+						.disabled(totalMinutes == nil)
+				}
 			}
 		}
 		// Line the fields up with the row titles above (row padding + icon width + spacing).
