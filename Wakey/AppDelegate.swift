@@ -12,6 +12,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 	private var hasCompletedInitialLaunch = false
 	
 	func applicationDidFinishLaunching(_ aNotification: Notification) {
+		UNUserNotificationCenter.current().delegate = self
 		NotificationManager.shared.requestAuthorization()
 		SoftwareUpdateManager.shared.start()
 		hasCompletedInitialLaunch = true
@@ -33,5 +34,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 	
 	static func openSettingsWindow() {
 		SettingsWindowCoordinator.shared.openSettingsWindow()
+	}
+}
+
+extension AppDelegate: UNUserNotificationCenterDelegate {
+	/// Without this, macOS hides the banner whenever Wakey is the frontmost app (for example while Settings is focused).
+	nonisolated func userNotificationCenter(
+		_ center: UNUserNotificationCenter,
+		willPresent notification: UNNotification
+	) async -> UNNotificationPresentationOptions {
+		[.banner, .sound]
 	}
 }

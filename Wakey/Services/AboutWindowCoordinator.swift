@@ -13,6 +13,7 @@ final class AboutWindowCoordinator: NSObject, NSWindowDelegate {
 	static let shared = AboutWindowCoordinator()
 	
 	private var aboutWindow: NSWindow?
+	private var restoreWindowLevelWorkItem: DispatchWorkItem?
 	
 	private override init() {}
 	
@@ -53,9 +54,22 @@ final class AboutWindowCoordinator: NSObject, NSWindowDelegate {
 	
 	private func configure(window: NSWindow) {
 		aboutWindow = window
+		restoreWindowLevelWorkItem?.cancel()
 		window.level = .floating
 		window.collectionBehavior.insert(.moveToActiveSpace)
 		window.makeKeyAndOrderFront(nil)
 		window.orderFrontRegardless()
+		
+		// Float only long enough to come in front of the dismissing menu, then behave like a normal window.
+		let restoreWorkItem = DispatchWorkItem { [weak self, weak window] in
+			guard let self, let window, self.aboutWindow === window else {
+				return
+			}
+			
+			window.level = .normal
+		}
+		
+		restoreWindowLevelWorkItem = restoreWorkItem
+		DispatchQueue.main.asyncAfter(deadline: .now() + 0.2, execute: restoreWorkItem)
 	}
 }

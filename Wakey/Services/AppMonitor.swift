@@ -87,7 +87,10 @@ final class AppMonitor: ObservableObject {
 	}
 	
 	private func checkRunningApps() {
-		isActive = !watchedApps.intersection(applicationProvider.runningApplicationBundleIdentifiers).isEmpty
+		let isActive = !watchedApps.intersection(applicationProvider.runningApplicationBundleIdentifiers).isEmpty
+		if self.isActive != isActive {
+			self.isActive = isActive
+		}
 	}
 	
 	private func saveWatchedApps() {

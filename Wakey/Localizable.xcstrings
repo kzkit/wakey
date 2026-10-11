@@ -1072,6 +1072,34 @@
         }
       }
     },
+    "Timer ended. A schedule or watched app is still keeping your Mac awake." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Timer beendet. Ein Zeitplan oder eine überwachte App hält deinen Mac weiterhin wach."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le minuteur est terminé. Une planification ou une app surveillée garde toujours votre Mac éveillé."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "タイマーが終了しました。スケジュールまたは監視するアプリにより、Macはスリープしないままです。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "计时结束。计划或监控的应用仍在让你的 Mac 保持唤醒。"
+          }
+        }
+      }
+    },
     "Timer ended. Your Mac can sleep now." : {
       "localizations" : {
         "de" : {

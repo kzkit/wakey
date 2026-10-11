@@ -14,6 +14,7 @@ struct SettingsView: View {
 	
 	@State private var schedule: Schedule
 	@State private var watchedApps: Set<String>
+	@State private var listedApps: [String: InstalledApp] = [:]
 	
 	private let wakeyColor = Color.blue
 	
@@ -41,6 +42,12 @@ struct SettingsView: View {
 		.background(SettingsWindowAccessor())
 		.onAppear {
 			syncSavedValues()
+		}
+		.onReceive(NSWorkspace.shared.notificationCenter.publisher(for: NSWorkspace.didLaunchApplicationNotification)) { _ in
+			refreshListedApps()
+		}
+		.onReceive(NSWorkspace.shared.notificationCenter.publisher(for: NSWorkspace.didTerminateApplicationNotification)) { _ in
+			refreshListedApps()
 		}
 	}
 	
@@ -362,6 +369,7 @@ struct SettingsView: View {
 		
 		viewModel.appMonitor.setWatchedApps(watchedApps)
 		viewModel.refreshState()
+		refreshListedApps()
 	}
 	
 	private func hourMenu(selectedHour: Int, onSelect: @escaping (Int) -> Void) -> some View {
@@ -391,9 +399,7 @@ struct SettingsView: View {
 	}
 	
 	private var categorizedApps: (watched: [InstalledApp], available: [InstalledApp], isEmpty: Bool) {
-		var apps = runningAppsByBundleIdentifier()
-		addStoppedWatchedApps(to: &apps)
-		let sortedApps = sortApps(apps.values)
+		let sortedApps = sortApps(listedApps.values)
 		
 		return (
 			watched: sortedApps.filter { watchedApps.contains($0.bundleIdentifier) },
@@ -424,6 +430,13 @@ struct SettingsView: View {
 				}
 			}
 		}
+	}
+	
+	/// Looking up apps and their icons is expensive, so it happens on launch/quit events rather than on every view update.
+	private func refreshListedApps() {
+		var apps = runningAppsByBundleIdentifier()
+		addStoppedWatchedApps(to: &apps)
+		listedApps = apps
 	}
 	
 	private func runningAppsByBundleIdentifier() -> [String: InstalledApp] {
@@ -483,6 +496,7 @@ struct SettingsView: View {
 	private func syncSavedValues() {
 		schedule = viewModel.schedulerManager.currentSchedule
 		watchedApps = viewModel.appMonitor.currentWatchedApps
+		refreshListedApps()
 		launchAtLoginManager.refreshStatus()
 	}
 	

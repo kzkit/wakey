@@ -9,7 +9,7 @@ import UserNotifications
 
 protocol NotificationSending {
 	func requestAuthorization()
-	func sendTimerEndedNotification()
+	func sendTimerEndedNotification(isStillAwake: Bool)
 }
 
 protocol UserNotificationCentering {
@@ -50,10 +50,12 @@ final class NotificationManager: NotificationSending {
 		}
 	}
 	
-	func sendTimerEndedNotification() {
+	func sendTimerEndedNotification(isStillAwake: Bool) {
 		let content = UNMutableNotificationContent()
 		content.title = "Wakey"
-		content.body = L10n.string("Timer ended. Your Mac can sleep now.")
+		content.body = isStillAwake
+			? L10n.string("Timer ended. A schedule or watched app is still keeping your Mac awake.")
+			: L10n.string("Timer ended. Your Mac can sleep now.")
 		content.sound = .default
 		
 		let request = UNNotificationRequest(

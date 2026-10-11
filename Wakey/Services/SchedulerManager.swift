@@ -59,7 +59,10 @@ final class SchedulerManager: ObservableObject {
 	}
 	
 	private func checkSchedule() {
-		isActive = schedule.isWithinSchedule(at: dateProvider())
+		let isActive = schedule.isWithinSchedule(at: dateProvider())
+		if self.isActive != isActive {
+			self.isActive = isActive
+		}
 	}
 	
 	private static func loadSchedule(from defaults: UserDefaults) -> Schedule {

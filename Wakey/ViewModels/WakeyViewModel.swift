@@ -21,6 +21,8 @@ final class WakeyViewModel: ObservableObject {
 	private let notificationSender: NotificationSending
 	private let startsCountdownTimers: Bool
 	private let defaults: UserDefaults
+	private let now: () -> ContinuousClock.Instant
+	private var countdownDeadline: ContinuousClock.Instant?
 	private var timerCancellable: AnyCancellable?
 	private var cancellables = Set<AnyCancellable>()
 	private var manualTimerActive = false
@@ -47,7 +49,8 @@ final class WakeyViewModel: ObservableObject {
 		sleepManager: SleepManaging,
 		notificationSender: NotificationSending,
 		startsCountdownTimers: Bool,
-		defaults: UserDefaults = .standard
+		defaults: UserDefaults = .standard,
+		now: @escaping () -> ContinuousClock.Instant = { ContinuousClock.now }
 	) {
 		self.schedulerManager = schedulerManager
 		self.appMonitor = appMonitor
@@ -56,6 +59,7 @@ final class WakeyViewModel: ObservableObject {
 		self.notificationSender = notificationSender
 		self.startsCountdownTimers = startsCountdownTimers
 		self.defaults = defaults
+		self.now = now
 		letsDisplayTurnOff = defaults.bool(forKey: DefaultsKey.letsDisplayTurnOff)
 		
 		schedulerManager.$isActive
@@ -81,6 +85,7 @@ final class WakeyViewModel: ObservableObject {
 
 		resetTimer()
 		manualTimerActive = true
+		countdownDeadline = seconds.map { now().advanced(by: .seconds($0)) }
 		remainingSeconds = seconds
 		
 		if seconds != nil && startsCountdownTimers {
@@ -88,23 +93,33 @@ final class WakeyViewModel: ObservableObject {
 		}
 		
 		updateSleepState()
+		
+		// The sleep assertion couldn't be created, so don't leave a session running that does nothing.
+		if !sleepManager.isActive {
+			stop()
+		}
 	}
 	
 	func stop() {
 		resetTimer()
 		manualTimerActive = false
+		countdownDeadline = nil
 		remainingSeconds = nil
 		updateSleepState()
 	}
 	
+	/// Derives the remaining time from `ContinuousClock`, which keeps counting through sleep and ignores system clock changes,
+	/// so throttled timers, a manual sleep, or a clock adjustment can't shift the countdown.
 	private func tick() {
-		guard let remaining = remainingSeconds else { return }
+		guard let countdownDeadline else { return }
 		
-		if remaining <= 1 {
-			notificationSender.sendTimerEndedNotification()
+		let remaining = (countdownDeadline - now()).timeInterval.rounded(.up)
+		
+		if remaining <= 0 {
 			stop()
-		} else {
-			remainingSeconds = remaining - 1
+			notificationSender.sendTimerEndedNotification(isStillAwake: isActive)
+		} else if remainingSeconds != remaining {
+			remainingSeconds = remaining
 		}
 	}
 	
@@ -134,11 +149,14 @@ final class WakeyViewModel: ObservableObject {
 			if !sleepManager.isActive {
 				_ = sleepManager.preventSleep(displayBehavior: sleepDisplayBehavior)
 			}
-		} else if !shouldBeActive && sleepManager.isActive {
+		} else if sleepManager.isActive {
 			sleepManager.allowSleep()
 		}
 		
-		isActive = shouldBeActive
+		let isActive = shouldBeActive && sleepManager.isActive
+		if self.isActive != isActive {
+			self.isActive = isActive
+		}
 	}
 	
 	private var nonTimedStatusText: String {
@@ -174,5 +192,12 @@ final class WakeyViewModel: ObservableObject {
 	private func resetTimer() {
 		timerCancellable?.cancel()
 		timerCancellable = nil
+	}
+}
+
+private extension Duration {
+	var timeInterval: TimeInterval {
+		let (seconds, attoseconds) = components
+		return TimeInterval(seconds) + TimeInterval(attoseconds) / 1e18
 	}
 }
