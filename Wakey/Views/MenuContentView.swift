@@ -150,7 +150,8 @@ struct MenuContentView: View {
 		VStack(alignment: .leading, spacing: 10) {
 			NativeMenuRow(
 				title: L10n.string("Stay awake anyway?"),
-				detail: (viewModel.batteryGuardReason ?? pendingStart.reason).message,
+				// When paused, the status row above already states the reason.
+				detail: viewModel.isPausedForLowBattery ? nil : (viewModel.batteryGuardReason ?? pendingStart.reason).message,
 				systemImage: "battery.25",
 				tint: .orange
 			)

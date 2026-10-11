@@ -97,13 +97,24 @@ private struct ChipStyle: ViewModifier {
 	let tint: Color
 	
 	@Environment(\.controlActiveState) private var controlActiveState
+	@Environment(\.colorScheme) private var colorScheme
 	
 	func body(content: Content) -> some View {
 		if #available(macOS 26.0, *) {
+			// Glass drops its tint while the window is inactive, which would leave selected and unselected chips the
+			// same grey. A selected chip then becomes a strong neutral pill instead (like a selected segment keeps a
+			// clearly stronger fill than the track), so the selection still reads without relying on colour.
+			let isWindowActive = controlActiveState != .inactive
+			
 			content
-				// Glass drops its tint while the window is inactive, so white text would lose its contrast there.
-				.foregroundStyle(isSelected && controlActiveState != .inactive ? Color.white : Color.primary)
-				.glassEffect(isSelected ? .regular.tint(tint).interactive() : .regular.interactive(), in: .capsule)
+				.foregroundStyle(chipForeground(isWindowActive: isWindowActive))
+				.background {
+					if isSelected && !isWindowActive {
+						Capsule(style: .continuous)
+							.fill(Color(nsColor: .secondaryLabelColor))
+					}
+				}
+				.glassEffect(isSelected && isWindowActive ? .regular.tint(tint).interactive() : .regular.interactive(), in: .capsule)
 		} else {
 			content
 				.foregroundStyle(isSelected ? Color.white : Color.primary)
@@ -112,6 +123,14 @@ private struct ChipStyle: ViewModifier {
 						.fill(isSelected ? tint : Color.primary.opacity(0.06))
 				)
 		}
+	}
+	
+	private func chipForeground(isWindowActive: Bool) -> Color {
+		guard isSelected else { return .primary }
+		guard !isWindowActive else { return .white }
+		
+		// The neutral pill is mid grey in light mode and light grey in dark mode, so dark text reads best on both.
+		return colorScheme == .dark ? Color(nsColor: .windowBackgroundColor) : .primary
 	}
 }
 
