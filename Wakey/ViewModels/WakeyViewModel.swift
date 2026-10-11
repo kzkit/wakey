@@ -15,6 +15,8 @@ final class WakeyViewModel: ObservableObject {
 	@Published private(set) var letsDisplayTurnOff: Bool
 	@Published private(set) var isBatteryGuardEnabled: Bool
 	@Published private(set) var batteryGuardThreshold: Int
+	/// Prefills the custom duration editor with the last custom length the user started.
+	@Published private(set) var lastCustomMinutes: Int
 	
 	let schedulerManager: SchedulerManager
 	let appMonitor: AppMonitor
@@ -37,7 +39,10 @@ final class WakeyViewModel: ObservableObject {
 		static let letsDisplayTurnOff = "letsDisplayTurnOff"
 		static let batteryGuardEnabled = "batteryGuardEnabled"
 		static let batteryGuardThreshold = "batteryGuardThreshold"
+		static let lastCustomMinutes = "lastCustomMinutes"
 	}
+	
+	static let defaultCustomMinutes = 45
 	
 	convenience init() {
 		self.init(
@@ -76,6 +81,10 @@ final class WakeyViewModel: ObservableObject {
 		let savedThreshold = defaults.integer(forKey: DefaultsKey.batteryGuardThreshold)
 		batteryGuardThreshold = BatteryGuard.thresholdOptions.contains(savedThreshold) ? savedThreshold : BatteryGuard.defaultThreshold
 		batteryState = batteryMonitor.state
+		let storedCustomMinutes = defaults.integer(forKey: DefaultsKey.lastCustomMinutes)
+		lastCustomMinutes = TimerDuration.customMinutesRange.contains(storedCustomMinutes)
+			? storedCustomMinutes
+			: Self.defaultCustomMinutes
 		
 		schedulerManager.$isActive
 			.combineLatest(appMonitor.$isActive)
@@ -128,8 +137,14 @@ final class WakeyViewModel: ObservableObject {
 		return remainingSeconds.map(formattedStatusTime) ?? nonTimedStatusText
 	}
 	
+	/// The single entry point for manual sessions, whether started from a preset, a custom duration, or `forever`.
 	func start(duration: TimerDuration) {
 		let seconds = duration.seconds
+		
+		// A zero or negative countdown would end immediately, so treat it as a no-op rather than starting a session.
+		if let seconds, seconds <= 0 {
+			return
+		}
 
 		resetTimer()
 		manualTimerActive = true
@@ -234,6 +249,13 @@ final class WakeyViewModel: ObservableObject {
 		updateSleepState()
 	}
 	
+	func setLastCustomMinutes(_ minutes: Int) {
+		guard TimerDuration.customMinutesRange.contains(minutes), lastCustomMinutes != minutes else { return }
+		
+		lastCustomMinutes = minutes
+		defaults.set(minutes, forKey: DefaultsKey.lastCustomMinutes)
+	}
+	
 	private func updateSleepState(
 		forceRefresh: Bool = false,
 		isScheduleActive: Bool? = nil,
@@ -279,9 +301,17 @@ final class WakeyViewModel: ObservableObject {
 		letsDisplayTurnOff ? .allowDisplayOff : .keepDisplayAwake
 	}
 	
+	/// Shows `h:mm:ss` while an hour or more remains, `m:ss` otherwise.
 	private func formattedStatusTime(_ remaining: TimeInterval) -> String {
-		let mins = Int(remaining) / 60
-		let secs = Int(remaining) % 60
+		let totalSeconds = Int(remaining)
+		let hours = totalSeconds / 3600
+		let mins = totalSeconds % 3600 / 60
+		let secs = totalSeconds % 60
+		
+		if hours > 0 {
+			return String(format: "%d:%02d:%02d", hours, mins, secs)
+		}
+		
 		return String(format: "%d:%02d", mins, secs)
 	}
 	
