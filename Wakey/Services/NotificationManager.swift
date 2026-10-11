@@ -10,6 +10,7 @@ import UserNotifications
 protocol NotificationSending {
 	func requestAuthorization()
 	func sendTimerEndedNotification(isStillAwake: Bool)
+	func sendBatteryGuardStoppedNotification(reason: BatteryGuardReason)
 }
 
 protocol UserNotificationCentering {
@@ -58,6 +59,24 @@ final class NotificationManager: NotificationSending {
 			: L10n.string("Timer ended. Your Mac can sleep now.")
 		content.sound = .default
 		
+		send(content)
+	}
+	
+	func sendBatteryGuardStoppedNotification(reason: BatteryGuardReason) {
+		let content = UNMutableNotificationContent()
+		content.title = L10n.string("Wakey stopped")
+		switch reason {
+		case .batteryLevel(let percent):
+			content.body = L10n.format("Battery is at %lld%%. Your Mac can sleep normally.", percent)
+		case .lowPowerMode:
+			content.body = L10n.string("Low Power Mode turned on. Your Mac can sleep normally.")
+		}
+		content.sound = .default
+		
+		send(content)
+	}
+	
+	private func send(_ content: UNNotificationContent) {
 		let request = UNNotificationRequest(
 			identifier: UUID().uuidString,
 			content: content,

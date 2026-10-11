@@ -16,6 +16,7 @@ final class WakeyViewModelTests: XCTestCase {
 	private var launchAtLoginService: MockViewModelLaunchAtLoginService!
 	private var sleepManager: MockSleepManager!
 	private var notificationSender: MockNotificationSender!
+	private var batteryStateProvider: MockBatteryStateProvider!
 	
 	override func setUp() {
 		super.setUp()
@@ -34,6 +35,7 @@ final class WakeyViewModelTests: XCTestCase {
 		launchAtLoginService = MockViewModelLaunchAtLoginService()
 		sleepManager = MockSleepManager()
 		notificationSender = MockNotificationSender()
+		batteryStateProvider = MockBatteryStateProvider()
 	}
 	
 	override func tearDown() {
@@ -52,6 +54,7 @@ final class WakeyViewModelTests: XCTestCase {
 		launchAtLoginService = nil
 		sleepManager = nil
 		notificationSender = nil
+		batteryStateProvider = nil
 		super.tearDown()
 	}
 	
@@ -276,15 +279,267 @@ final class WakeyViewModelTests: XCTestCase {
 		XCTAssertEqual(sleepManager.preventSleepCallCount, 1)
 		XCTAssertEqual(sleepManager.allowSleepCallCount, 0)
 	}
-	
+
+	func testBatteryGuardIsOffByDefaultAndDoesNotPauseSchedule() {
+		batteryStateProvider.state = Self.onBattery(level: 5)
+		let scheduler = makeSchedulerManager()
+		let viewModel = makeViewModel(schedulerManager: scheduler)
+
+		scheduler.updateSchedule(Schedule(isEnabled: true, startHour: 9, endHour: 17))
+
+		XCTAssertFalse(viewModel.isBatteryGuardEnabled)
+		XCTAssertEqual(viewModel.batteryGuardThreshold, 20)
+		XCTAssertNil(viewModel.batteryGuardReason)
+		XCTAssertFalse(viewModel.needsBatteryConfirmation)
+		XCTAssertTrue(viewModel.isActive)
+	}
+
+	func testBatteryGuardSettingsPersist() {
+		let viewModel = makeViewModel()
+
+		viewModel.setBatteryGuardEnabled(true)
+		viewModel.setBatteryGuardThreshold(30)
+		viewModel.setBatteryGuardThreshold(25)
+		let reloadedViewModel = makeViewModel()
+
+		XCTAssertTrue(reloadedViewModel.isBatteryGuardEnabled)
+		XCTAssertEqual(reloadedViewModel.batteryGuardThreshold, 30)
+	}
+
+	func testLowBatteryPausesScheduleAndResumesWhenPluggedIn() {
+		let batteryMonitor = makeBatteryMonitor()
+		let scheduler = makeSchedulerManager()
+		let viewModel = makeViewModel(schedulerManager: scheduler, batteryMonitor: batteryMonitor)
+		viewModel.setBatteryGuardEnabled(true)
+		scheduler.updateSchedule(Schedule(isEnabled: true, startHour: 9, endHour: 17))
+		XCTAssertTrue(viewModel.isActive)
+
+		setBatteryState(Self.onBattery(level: 15), of: batteryMonitor)
+
+		XCTAssertFalse(viewModel.isActive)
+		XCTAssertTrue(viewModel.isPausedForLowBattery)
+		XCTAssertEqual(viewModel.batteryGuardReason, .batteryLevel(15))
+		XCTAssertEqual(viewModel.statusText, "Inactive")
+		XCTAssertEqual(sleepManager.allowSleepCallCount, 1)
+		XCTAssertTrue(notificationSender.batteryGuardStoppedReasons.isEmpty)
+
+		setBatteryState(Self.onCharger(level: 15), of: batteryMonitor)
+
+		XCTAssertTrue(viewModel.isActive)
+		XCTAssertFalse(viewModel.isPausedForLowBattery)
+		XCTAssertEqual(viewModel.statusText, "Scheduled run")
+	}
+
+	func testLowPowerModePausesWatchedAppsUntilTurnedOff() {
+		let batteryMonitor = makeBatteryMonitor()
+		let appMonitor = makeAppMonitor()
+		let viewModel = makeViewModel(appMonitor: appMonitor, batteryMonitor: batteryMonitor)
+		viewModel.setBatteryGuardEnabled(true)
+		setBatteryState(Self.onBattery(level: 90, isLowPowerModeEnabled: true), of: batteryMonitor)
+
+		runningApplications.runningApplicationBundleIdentifiers = ["com.example.Editor"]
+		appMonitor.setWatchedApps(["com.example.Editor"])
+
+		XCTAssertFalse(viewModel.isActive)
+		XCTAssertTrue(viewModel.isPausedForLowBattery)
+		XCTAssertEqual(viewModel.batteryGuardReason, .lowPowerMode)
+		XCTAssertEqual(sleepManager.preventSleepCallCount, 0)
+
+		setBatteryState(Self.onBattery(level: 90), of: batteryMonitor)
+
+		XCTAssertTrue(viewModel.isActive)
+		XCTAssertEqual(viewModel.statusText, "App running")
+	}
+
+	func testBatteryGuardNeverAppliesOnChargerOrWithoutBattery() {
+		let batteryMonitor = makeBatteryMonitor()
+		let viewModel = makeViewModel(batteryMonitor: batteryMonitor)
+		viewModel.setBatteryGuardEnabled(true)
+
+		setBatteryState(Self.onCharger(level: 5, isLowPowerModeEnabled: true), of: batteryMonitor)
+		XCTAssertNil(viewModel.batteryGuardReason)
+		XCTAssertTrue(viewModel.hasBattery)
+
+		setBatteryState(.noBattery, of: batteryMonitor)
+		XCTAssertNil(viewModel.batteryGuardReason)
+		XCTAssertFalse(viewModel.hasBattery)
+	}
+
+	func testManualStartWhileLowNeedsConfirmationAndConfirmedSessionIsExempt() {
+		batteryStateProvider.state = Self.onBattery(level: 15)
+		let batteryMonitor = makeBatteryMonitor()
+		let scheduler = makeSchedulerManager()
+		let viewModel = makeViewModel(schedulerManager: scheduler, batteryMonitor: batteryMonitor)
+		viewModel.setBatteryGuardEnabled(true)
+		scheduler.updateSchedule(Schedule(isEnabled: true, startHour: 9, endHour: 17))
+
+		XCTAssertTrue(viewModel.needsBatteryConfirmation)
+		XCTAssertFalse(viewModel.isActive)
+
+		viewModel.start(duration: .forever)
+
+		XCTAssertTrue(viewModel.isActive)
+		XCTAssertEqual(viewModel.statusText, "Forever")
+
+		// Charging and draining again doesn't stop a session the user confirmed.
+		setBatteryState(Self.onCharger(level: 15), of: batteryMonitor)
+		setBatteryState(Self.onBattery(level: 12), of: batteryMonitor)
+		setBatteryState(Self.onBattery(level: 12, isLowPowerModeEnabled: true), of: batteryMonitor)
+
+		XCTAssertTrue(viewModel.isActive)
+		XCTAssertTrue(viewModel.canStop)
+		XCTAssertTrue(notificationSender.batteryGuardStoppedReasons.isEmpty)
+	}
+
+	func testBatteryBecomingLowStopsManualSessionAndNotifies() {
+		let batteryMonitor = makeBatteryMonitor()
+		let viewModel = makeViewModel(batteryMonitor: batteryMonitor)
+		viewModel.setBatteryGuardEnabled(true)
+		setBatteryState(Self.onBattery(level: 25), of: batteryMonitor)
+
+		XCTAssertFalse(viewModel.needsBatteryConfirmation)
+		viewModel.start(duration: .tenMinutes)
+		setBatteryState(Self.onBattery(level: 21), of: batteryMonitor)
+		XCTAssertTrue(viewModel.isActive)
+
+		setBatteryState(Self.onBattery(level: 19), of: batteryMonitor)
+
+		XCTAssertFalse(viewModel.isActive)
+		XCTAssertFalse(viewModel.canStop)
+		XCTAssertNil(viewModel.remainingSeconds)
+		XCTAssertEqual(notificationSender.batteryGuardStoppedReasons, [.batteryLevel(19)])
+		XCTAssertEqual(notificationSender.timerEndedCallCount, 0)
+
+		// Plugging back in doesn't restart the session the guard stopped.
+		setBatteryState(Self.onCharger(level: 19), of: batteryMonitor)
+
+		XCTAssertFalse(viewModel.isActive)
+		XCTAssertFalse(viewModel.canStop)
+		XCTAssertEqual(sleepManager.preventSleepCallCount, 1)
+	}
+
+	func testUnpluggingWithLowBatteryStopsManualSession() {
+		batteryStateProvider.state = Self.onCharger(level: 10)
+		let batteryMonitor = makeBatteryMonitor()
+		let viewModel = makeViewModel(batteryMonitor: batteryMonitor)
+		viewModel.setBatteryGuardEnabled(true)
+		viewModel.start(duration: .forever)
+
+		setBatteryState(Self.onBattery(level: 10), of: batteryMonitor)
+
+		XCTAssertFalse(viewModel.isActive)
+		XCTAssertEqual(notificationSender.batteryGuardStoppedReasons, [.batteryLevel(10)])
+	}
+
+	func testLowPowerModeTurningOnStopsManualSession() {
+		batteryStateProvider.state = Self.onBattery(level: 80)
+		let batteryMonitor = makeBatteryMonitor()
+		let viewModel = makeViewModel(batteryMonitor: batteryMonitor)
+		viewModel.setBatteryGuardEnabled(true)
+		viewModel.start(duration: .forever)
+
+		setBatteryState(Self.onBattery(level: 80, isLowPowerModeEnabled: true), of: batteryMonitor)
+
+		XCTAssertFalse(viewModel.isActive)
+		XCTAssertEqual(notificationSender.batteryGuardStoppedReasons, [.lowPowerMode])
+	}
+
+	func testBatteryBecomingLowWithGuardOffKeepsManualSession() {
+		batteryStateProvider.state = Self.onBattery(level: 25)
+		let batteryMonitor = makeBatteryMonitor()
+		let viewModel = makeViewModel(batteryMonitor: batteryMonitor)
+		viewModel.start(duration: .forever)
+
+		setBatteryState(Self.onBattery(level: 15), of: batteryMonitor)
+
+		XCTAssertTrue(viewModel.isActive)
+		XCTAssertTrue(notificationSender.batteryGuardStoppedReasons.isEmpty)
+	}
+
+	func testTurningGuardOffMidSessionKeepsEverythingRunning() {
+		batteryStateProvider.state = Self.onBattery(level: 15)
+		let scheduler = makeSchedulerManager()
+		let viewModel = makeViewModel(schedulerManager: scheduler)
+		viewModel.setBatteryGuardEnabled(true)
+		viewModel.start(duration: .forever)
+		scheduler.updateSchedule(Schedule(isEnabled: true, startHour: 9, endHour: 17))
+
+		viewModel.setBatteryGuardEnabled(false)
+
+		XCTAssertTrue(viewModel.isActive)
+		XCTAssertTrue(viewModel.canStop)
+		XCTAssertFalse(viewModel.isPausedForLowBattery)
+		XCTAssertEqual(sleepManager.allowSleepCallCount, 0)
+	}
+
+	func testTurningGuardOnWhileLowKeepsRunningManualSessionAndPausesSchedule() {
+		batteryStateProvider.state = Self.onBattery(level: 15)
+		let batteryMonitor = makeBatteryMonitor()
+		let scheduler = makeSchedulerManager()
+		let viewModel = makeViewModel(schedulerManager: scheduler, batteryMonitor: batteryMonitor)
+		scheduler.updateSchedule(Schedule(isEnabled: true, startHour: 9, endHour: 17))
+		viewModel.start(duration: .oneMinute)
+
+		viewModel.setBatteryGuardEnabled(true)
+
+		XCTAssertTrue(viewModel.isActive)
+		XCTAssertTrue(viewModel.canStop)
+		XCTAssertTrue(notificationSender.batteryGuardStoppedReasons.isEmpty)
+
+		// The running session is treated as confirmed, so later battery changes don't stop it either.
+		setBatteryState(Self.onCharger(level: 15), of: batteryMonitor)
+		setBatteryState(Self.onBattery(level: 15), of: batteryMonitor)
+		XCTAssertTrue(viewModel.canStop)
+
+		// Once the manual session ends, the paused schedule no longer keeps the Mac awake.
+		advanceCountdown(of: viewModel, by: 60)
+
+		XCTAssertFalse(viewModel.isActive)
+		XCTAssertTrue(viewModel.isPausedForLowBattery)
+		XCTAssertEqual(notificationSender.lastIsStillAwake, false)
+	}
+
+	func testRaisingThresholdMidSessionDoesNotStopManualSession() {
+		batteryStateProvider.state = Self.onBattery(level: 25)
+		let batteryMonitor = makeBatteryMonitor()
+		let viewModel = makeViewModel(batteryMonitor: batteryMonitor)
+		viewModel.setBatteryGuardEnabled(true)
+		viewModel.start(duration: .forever)
+
+		viewModel.setBatteryGuardThreshold(30)
+		setBatteryState(Self.onBattery(level: 24), of: batteryMonitor)
+
+		XCTAssertTrue(viewModel.isActive)
+		XCTAssertEqual(viewModel.batteryGuardReason, .batteryLevel(24))
+		XCTAssertTrue(notificationSender.batteryGuardStoppedReasons.isEmpty)
+	}
+
+	func testNewSessionAfterGuardStopIsStoppedAgainOnNextLowTransition() {
+		batteryStateProvider.state = Self.onBattery(level: 25)
+		let batteryMonitor = makeBatteryMonitor()
+		let viewModel = makeViewModel(batteryMonitor: batteryMonitor)
+		viewModel.setBatteryGuardEnabled(true)
+		viewModel.start(duration: .forever)
+		setBatteryState(Self.onBattery(level: 19), of: batteryMonitor)
+		setBatteryState(Self.onCharger(level: 40), of: batteryMonitor)
+
+		viewModel.start(duration: .forever)
+		setBatteryState(Self.onBattery(level: 40, isLowPowerModeEnabled: true), of: batteryMonitor)
+
+		XCTAssertFalse(viewModel.isActive)
+		XCTAssertEqual(notificationSender.batteryGuardStoppedReasons, [.batteryLevel(19), .lowPowerMode])
+	}
+
 	private func makeViewModel(
 		schedulerManager: SchedulerManager? = nil,
-		appMonitor: AppMonitor? = nil
+		appMonitor: AppMonitor? = nil,
+		batteryMonitor: BatteryMonitor? = nil
 	) -> WakeyViewModel {
 		WakeyViewModel(
 			schedulerManager: schedulerManager ?? makeSchedulerManager(),
 			appMonitor: appMonitor ?? makeAppMonitor(),
 			launchAtLoginManager: LaunchAtLoginManager(service: launchAtLoginService),
+			batteryMonitor: batteryMonitor ?? makeBatteryMonitor(),
 			sleepManager: sleepManager,
 			notificationSender: notificationSender,
 			startsCountdownTimers: false,
@@ -293,6 +548,19 @@ final class WakeyViewModelTests: XCTestCase {
 		)
 	}
 	
+	private func setBatteryState(_ state: BatteryState, of batteryMonitor: BatteryMonitor) {
+		batteryStateProvider.state = state
+		batteryMonitor.refresh()
+	}
+
+	private static func onBattery(level: Int, isLowPowerModeEnabled: Bool = false) -> BatteryState {
+		BatteryState(hasBattery: true, isOnBatteryPower: true, levelPercent: level, isLowPowerModeEnabled: isLowPowerModeEnabled)
+	}
+
+	private static func onCharger(level: Int, isLowPowerModeEnabled: Bool = false) -> BatteryState {
+		BatteryState(hasBattery: true, isOnBatteryPower: false, levelPercent: level, isLowPowerModeEnabled: isLowPowerModeEnabled)
+	}
+
 	private func advanceCountdown(of viewModel: WakeyViewModel, by seconds: TimeInterval) {
 		clockNow = clockNow.advanced(by: .seconds(seconds))
 		viewModel.advanceCountdownForTesting()
@@ -304,6 +572,10 @@ final class WakeyViewModelTests: XCTestCase {
 	
 	private func makeAppMonitor() -> AppMonitor {
 		AppMonitor(defaults: appDefaults, applicationProvider: runningApplications, startsMonitoring: false)
+	}
+	
+	private func makeBatteryMonitor() -> BatteryMonitor {
+		BatteryMonitor(stateProvider: batteryStateProvider, startsMonitoring: false)
 	}
 	
 	private static func date(hour: Int) -> Date {
@@ -343,6 +615,7 @@ private final class MockNotificationSender: NotificationSending {
 	private(set) var requestAuthorizationCallCount = 0
 	private(set) var timerEndedCallCount = 0
 	private(set) var lastIsStillAwake: Bool?
+	private(set) var batteryGuardStoppedReasons: [BatteryGuardReason] = []
 	
 	func requestAuthorization() {
 		requestAuthorizationCallCount += 1
@@ -352,8 +625,20 @@ private final class MockNotificationSender: NotificationSending {
 		timerEndedCallCount += 1
 		lastIsStillAwake = isStillAwake
 	}
+	
+	func sendBatteryGuardStoppedNotification(reason: BatteryGuardReason) {
+		batteryGuardStoppedReasons.append(reason)
+	}
 }
 
 private final class MockRunningApplicationProvider: RunningApplicationProviding {
 	var runningApplicationBundleIdentifiers: Set<String> = []
+}
+
+private final class MockBatteryStateProvider: BatteryStateProviding {
+	var state = BatteryState(hasBattery: true, isOnBatteryPower: false, levelPercent: 80, isLowPowerModeEnabled: false)
+	
+	func currentBatteryState() -> BatteryState {
+		state
+	}
 }

@@ -65,6 +65,16 @@ struct SettingsView: View {
 				SettingsDivider()
 				displayTurnOffRow
 				
+				if viewModel.hasBattery {
+					SettingsDivider()
+					batteryGuardRow
+					
+					if viewModel.isBatteryGuardEnabled {
+						SettingsDivider()
+						batteryThresholdRow
+					}
+				}
+				
 				if launchAtLoginManager.requiresApproval {
 					SettingsDivider()
 					launchAtLoginApprovalRow
@@ -137,6 +147,75 @@ struct SettingsView: View {
 		}
 		.padding(.horizontal, 14)
 		.padding(.vertical, 10)
+	}
+	
+	private var batteryGuardRow: some View {
+		HStack(spacing: 12) {
+			Image(systemName: "battery.25")
+				.font(.system(size: 15, weight: .semibold))
+				.frame(width: 24, height: 24)
+
+			VStack(alignment: .leading, spacing: 2) {
+				Text("Battery guard")
+					.font(.callout)
+
+				Text("Let your Mac sleep when the battery is low or Low Power Mode is on.")
+					.font(.caption)
+					.foregroundStyle(.secondary)
+			}
+
+			Spacer(minLength: 0)
+
+			Toggle("", isOn: Binding(
+				get: { viewModel.isBatteryGuardEnabled },
+				set: { viewModel.setBatteryGuardEnabled($0) }
+			))
+			.labelsHidden()
+			.toggleStyle(.switch)
+		}
+		.padding(.horizontal, 14)
+		.padding(.vertical, 10)
+	}
+
+	private var batteryThresholdRow: some View {
+		HStack(spacing: 12) {
+			Image(systemName: "gauge.with.dots.needle.33percent")
+				.font(.system(size: 15, weight: .semibold))
+				.frame(width: 24, height: 24)
+
+			Text("Low battery level")
+				.font(.callout)
+
+			Spacer(minLength: 0)
+
+			Menu {
+				ForEach(BatteryGuard.thresholdOptions, id: \.self) { threshold in
+					Button(L10n.format("%lld%%", threshold)) {
+						viewModel.setBatteryGuardThreshold(threshold)
+					}
+				}
+			} label: {
+				HStack(spacing: 6) {
+					Text(L10n.format("%lld%%", viewModel.batteryGuardThreshold))
+						.monospacedDigit()
+
+					Image(systemName: "chevron.up.chevron.down")
+						.font(.caption2.weight(.semibold))
+						.foregroundStyle(.secondary)
+				}
+				.padding(.horizontal, 9)
+				.padding(.vertical, 5)
+				.background(
+					RoundedRectangle(cornerRadius: 7, style: .continuous)
+						.fill(Color.primary.opacity(0.06))
+				)
+			}
+			.menuStyle(.borderlessButton)
+			.fixedSize()
+		}
+		.padding(.horizontal, 14)
+		.padding(.vertical, 10)
+		.transition(.opacity.combined(with: .move(edge: .top)))
 	}
 	
 	private var launchAtLoginApprovalRow: some View {
@@ -241,15 +320,17 @@ struct SettingsView: View {
 	}
 	
 	private var scheduleActiveRow: some View {
-		HStack(spacing: 12) {
-			Image(systemName: "checkmark")
+		let isPausedForLowBattery = viewModel.batteryGuardReason != nil
+		
+		return HStack(spacing: 12) {
+			Image(systemName: isPausedForLowBattery ? "pause.fill" : "checkmark")
 				.font(.system(size: 15, weight: .semibold))
 				.frame(width: 24, height: 24)
 			VStack(alignment: .leading, spacing: 2) {
-				Text("Schedule active now")
+				Text(L10n.string(isPausedForLowBattery ? "Schedule paused — low battery" : "Schedule active now"))
 					.font(.callout)
 				
-				Text("Wakey is currently preventing sleep from this rule.")
+				Text(L10n.string(isPausedForLowBattery ? "Resumes automatically when the battery is no longer low." : "Wakey is currently preventing sleep from this rule."))
 					.font(.caption)
 					.foregroundStyle(.secondary)
 			}
