@@ -44,6 +44,12 @@ struct MenuContentView: View {
 		.onDisappear {
 			pendingBatteryStart = nil
 		}
+		.onChange(of: viewModel.batteryGuardReason) { _, reason in
+			// Plugged in or Low Power Mode turned off while asking: there's nothing left to confirm.
+			if reason == nil {
+				pendingBatteryStart = nil
+			}
+		}
 	}
 	
 	private var header: some View {
@@ -168,7 +174,9 @@ struct MenuContentView: View {
 					
 					Button(L10n.string("Stay Awake")) {
 						pendingBatteryStart = nil
-						performAndDismissMenu(pendingStart.start)
+						performAndDismissMenu {
+							pendingStart.start(true)
+						}
 					}
 					.keyboardShortcut(.defaultAction)
 					.primaryActionButtonStyle()
@@ -282,8 +290,8 @@ struct MenuContentView: View {
 	}
 	
 	private func startSession(_ duration: TimerDuration) {
-		requestStart {
-			viewModel.start(duration: duration)
+		requestStart { confirmedLowBattery in
+			viewModel.start(duration: duration, confirmedLowBattery: confirmedLowBattery)
 		}
 	}
 	
@@ -294,9 +302,11 @@ struct MenuContentView: View {
 	
 	/// Gate for every manual start: while the battery guard applies, ask inside the menu first.
 	/// The start is passed in, so any start button can share it, and a start the user confirms is exempt from the guard.
-	private func requestStart(_ start: @escaping () -> Void) {
+	private func requestStart(_ start: @escaping (Bool) -> Void) {
 		guard let reason = viewModel.batteryGuardReason else {
-			performAndDismissMenu(start)
+			performAndDismissMenu {
+				start(false)
+			}
 			return
 		}
 		
@@ -306,7 +316,8 @@ struct MenuContentView: View {
 
 private struct PendingBatteryStart {
 	let reason: BatteryGuardReason
-	let start: () -> Void
+	/// Starts the session; the argument says whether the user confirmed it despite low battery.
+	let start: (Bool) -> Void
 }
 
 private struct FooterMenuRowButton: View {

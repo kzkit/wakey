@@ -23,4 +23,11 @@ final class CustomDurationEditorTests: XCTestCase {
 	func testSanitizedNumberAcceptsFullWidthDigits() {
 		XCTAssertEqual(CustomDurationEditor.sanitizedNumber("１２", upperBound: 23), "12")
 	}
+	
+	func testParsedNumberReadsUnsanitizedText() {
+		XCTAssertEqual(CustomDurationEditor.parsedNumber("４５", upperBound: 59), 45)
+		XCTAssertEqual(CustomDurationEditor.parsedNumber("9a", upperBound: 59), 9)
+		XCTAssertEqual(CustomDurationEditor.parsedNumber("", upperBound: 59), 0)
+		XCTAssertEqual(CustomDurationEditor.parsedNumber("75", upperBound: 59), 59)
+	}
 }

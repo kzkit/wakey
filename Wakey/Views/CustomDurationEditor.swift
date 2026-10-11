@@ -82,15 +82,18 @@ struct CustomDurationEditor: View {
 			}
 		}
 		.onExitCommand(perform: onCancel)
+		.onChange(of: focusedField) {
+			normalizeFields()
+		}
 	}
 	
 	private var hours: Int {
-		get { Int(hoursText) ?? 0 }
+		get { Self.parsedNumber(hoursText, upperBound: Self.maxHours) }
 		nonmutating set { hoursText = String(newValue) }
 	}
 	
 	private var minutes: Int {
-		get { Int(minutesText) ?? 0 }
+		get { Self.parsedNumber(minutesText, upperBound: Self.maxMinutes) }
 		nonmutating set { minutesText = String(newValue) }
 	}
 	
@@ -101,15 +104,28 @@ struct CustomDurationEditor: View {
 	}
 	
 	private func start() {
+		normalizeFields()
 		guard let totalMinutes else { return }
 		
 		onStart(totalMinutes)
 	}
 	
-	private func numberField(text: Binding<String>, field: Field, accessibilityLabel: String) -> some View {
-		let upperBound = field == .hours ? Self.maxHours : Self.maxMinutes
+	/// Rewrites both fields to their clamped digits. This only runs on submit or when focus moves, never while typing,
+	/// so text an input method is still composing (e.g. full-width digits in Japanese) is left alone.
+	private func normalizeFields() {
+		let sanitizedHours = Self.sanitizedNumber(hoursText, upperBound: Self.maxHours)
+		if sanitizedHours != hoursText {
+			hoursText = sanitizedHours
+		}
 		
-		return TextField("", text: text, prompt: Text(verbatim: "0"))
+		let sanitizedMinutes = Self.sanitizedNumber(minutesText, upperBound: Self.maxMinutes)
+		if sanitizedMinutes != minutesText {
+			minutesText = sanitizedMinutes
+		}
+	}
+	
+	private func numberField(text: Binding<String>, field: Field, accessibilityLabel: String) -> some View {
+		TextField("", text: text, prompt: Text(verbatim: "0"))
 			.labelsHidden()
 			.accessibilityLabel(accessibilityLabel)
 			.multilineTextAlignment(.trailing)
@@ -117,12 +133,6 @@ struct CustomDurationEditor: View {
 			.frame(width: 34)
 			.focused($focusedField, equals: field)
 			.onSubmit(start)
-			.onChange(of: text.wrappedValue) { _, newValue in
-				let sanitized = Self.sanitizedNumber(newValue, upperBound: upperBound)
-				if sanitized != newValue {
-					text.wrappedValue = sanitized
-				}
-			}
 	}
 	
 	private func unitLabel(_ title: String) -> some View {
@@ -131,6 +141,10 @@ struct CustomDurationEditor: View {
 			.foregroundStyle(.secondary)
 			.fixedSize()
 			.padding(.trailing, 8)
+	}
+	
+	static func parsedNumber(_ text: String, upperBound: Int) -> Int {
+		Int(sanitizedNumber(text, upperBound: upperBound)) ?? 0
 	}
 	
 	/// Keeps at most two digits (accepting full-width digits from input methods) and clamps them to `upperBound`.

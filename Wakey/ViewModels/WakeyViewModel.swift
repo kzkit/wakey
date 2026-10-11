@@ -31,8 +31,8 @@ final class WakeyViewModel: ObservableObject {
 	private var timerCancellable: AnyCancellable?
 	private var cancellables = Set<AnyCancellable>()
 	private var manualTimerActive = false
-	private var batteryState: BatteryState
-	/// Set when the user started (or kept) a manual session while the battery guard already applied.
+	@Published private var batteryState: BatteryState
+	/// Set when the user confirmed (or kept) a manual session while the battery guard already applied.
 	private var manualSessionIgnoresBatteryGuard = false
 
 	private enum DefaultsKey {
@@ -115,8 +115,8 @@ final class WakeyViewModel: ObservableObject {
 		return BatteryGuard.lowBatteryReason(for: batteryState, threshold: batteryGuardThreshold)
 	}
 	
-	/// A manual start should ask before overriding the guard. Any start made while this is true is exempt from the guard,
-	/// so the menu checks it first and only calls `start` once the user confirms.
+	/// A manual start should ask before overriding the guard. The menu checks this first and passes
+	/// `confirmedLowBattery: true` to `start` once the user confirms.
 	var needsBatteryConfirmation: Bool {
 		batteryGuardReason != nil
 	}
@@ -138,7 +138,8 @@ final class WakeyViewModel: ObservableObject {
 	}
 	
 	/// The single entry point for manual sessions, whether started from a preset, a custom duration, or `forever`.
-	func start(duration: TimerDuration) {
+	/// Only a start the user confirmed despite low battery (`confirmedLowBattery`) is exempt from the battery guard.
+	func start(duration: TimerDuration, confirmedLowBattery: Bool = false) {
 		let seconds = duration.seconds
 		
 		// A zero or negative countdown would end immediately, so treat it as a no-op rather than starting a session.
@@ -148,7 +149,7 @@ final class WakeyViewModel: ObservableObject {
 
 		resetTimer()
 		manualTimerActive = true
-		manualSessionIgnoresBatteryGuard = needsBatteryConfirmation
+		manualSessionIgnoresBatteryGuard = confirmedLowBattery
 		countdownDeadline = seconds.map { now().advanced(by: .seconds($0)) }
 		remainingSeconds = seconds
 		
@@ -229,10 +230,7 @@ final class WakeyViewModel: ObservableObject {
 	}
 	
 	private func batteryStateDidChange(_ state: BatteryState) {
-		guard batteryState != state else { return }
-		
-		// `@Published` emits before the new value is stored, so keep our own copy of the emitted state.
-		objectWillChange.send()
+		// `@Published` emits before the monitor stores the new value, so keep our own copy of the emitted state.
 		let wasLowBattery = BatteryGuard.lowBatteryReason(for: batteryState, threshold: batteryGuardThreshold) != nil
 		batteryState = state
 		

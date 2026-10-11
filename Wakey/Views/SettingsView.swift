@@ -342,8 +342,18 @@ struct SettingsView: View {
 		.transition(.opacity.combined(with: .move(edge: .top)))
 	}
 	
+	/// Names days in Wakey's own language, which can differ from the region's when a per-app language is set.
+	/// The order of days still follows the region via `Calendar.current.firstWeekday`.
+	private var weekdaySymbolCalendar: Calendar {
+		var calendar = Calendar.current
+		if let language = Bundle.main.preferredLocalizations.first {
+			calendar.locale = Locale(identifier: language)
+		}
+		return calendar
+	}
+	
 	private func weekdayChip(_ weekday: Int) -> some View {
-		let calendar = Calendar.current
+		let calendar = weekdaySymbolCalendar
 		let isSelected = schedule.weekdays.contains(weekday)
 		
 		return Button {

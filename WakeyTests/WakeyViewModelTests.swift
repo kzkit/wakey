@@ -432,7 +432,7 @@ final class WakeyViewModelTests: XCTestCase {
 		XCTAssertTrue(viewModel.needsBatteryConfirmation)
 		XCTAssertFalse(viewModel.isActive)
 
-		viewModel.start(duration: .forever)
+		viewModel.start(duration: .forever, confirmedLowBattery: true)
 
 		XCTAssertTrue(viewModel.isActive)
 		XCTAssertEqual(viewModel.statusText, "Forever")
@@ -445,6 +445,23 @@ final class WakeyViewModelTests: XCTestCase {
 		XCTAssertTrue(viewModel.isActive)
 		XCTAssertTrue(viewModel.canStop)
 		XCTAssertTrue(notificationSender.batteryGuardStoppedReasons.isEmpty)
+	}
+
+	func testUnconfirmedStartWhileLowIsNotExempt() {
+		batteryStateProvider.state = Self.onBattery(level: 15)
+		let batteryMonitor = makeBatteryMonitor()
+		let viewModel = makeViewModel(batteryMonitor: batteryMonitor)
+		viewModel.setBatteryGuardEnabled(true)
+
+		// A start that skipped the confirmation still runs, but the guard can stop it later.
+		viewModel.start(duration: .forever)
+		XCTAssertTrue(viewModel.isActive)
+
+		setBatteryState(Self.onCharger(level: 15), of: batteryMonitor)
+		setBatteryState(Self.onBattery(level: 12), of: batteryMonitor)
+
+		XCTAssertFalse(viewModel.isActive)
+		XCTAssertEqual(notificationSender.batteryGuardStoppedReasons, [.batteryLevel(12)])
 	}
 
 	func testBatteryBecomingLowStopsManualSessionAndNotifies() {
