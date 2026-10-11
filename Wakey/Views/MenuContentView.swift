@@ -12,6 +12,7 @@ struct MenuContentView: View {
 	@ObservedObject var viewModel: WakeyViewModel
 	@ObservedObject private var softwareUpdateManager = SoftwareUpdateManager.shared
 	@Environment(\.dismiss) private var dismiss
+	@State private var isEditingCustomDuration = false
 	
 	var body: some View {
 		VStack(alignment: .leading, spacing: 0) {
@@ -70,6 +71,9 @@ struct MenuContentView: View {
 			
 			timerControls
 		}
+		.onDisappear {
+			isEditingCustomDuration = false
+		}
 	}
 	
 	private var activeControl: some View {
@@ -86,19 +90,52 @@ struct MenuContentView: View {
 	
 	private var timerControls: some View {
 		VStack(spacing: 2) {
-			ForEach(TimerDuration.allCases) { duration in
-				NativeMenuRowButton(
-					title: duration.displayName,
-					detail: timerDetail(for: duration),
-					systemImage: duration == .forever ? "infinity" : "timer",
-					tint: .primary,
-					action: {
-						performAndDismissMenu {
-							viewModel.start(duration: duration)
-						}
-					}
-				)
+			ForEach(TimerDuration.timedPresets) { duration in
+				timerRow(for: duration)
 			}
+			
+			customDurationControl
+			
+			timerRow(for: .forever)
+		}
+	}
+	
+	private func timerRow(for duration: TimerDuration) -> some View {
+		NativeMenuRowButton(
+			title: duration.displayName,
+			detail: timerDetail(for: duration),
+			systemImage: duration == .forever ? "infinity" : "timer",
+			tint: .primary,
+			action: {
+				startSession(duration)
+			}
+		)
+	}
+	
+	@ViewBuilder
+	private var customDurationControl: some View {
+		NativeMenuRowButton(
+			title: L10n.string("Custom…"),
+			detail: nil,
+			systemImage: "slider.horizontal.3",
+			tint: .primary,
+			action: {
+				isEditingCustomDuration.toggle()
+			}
+		)
+		
+		if isEditingCustomDuration {
+			CustomDurationEditor(
+				initialMinutes: viewModel.lastCustomMinutes,
+				onStart: { minutes in
+					viewModel.setLastCustomMinutes(minutes)
+					isEditingCustomDuration = false
+					startSession(.minutes(minutes))
+				},
+				onCancel: {
+					isEditingCustomDuration = false
+				}
+			)
 		}
 	}
 	
@@ -179,6 +216,12 @@ struct MenuContentView: View {
 	
 	private func timerDetail(for duration: TimerDuration) -> String? {
 		duration == .forever ? L10n.string("Until you stop it.") : nil
+	}
+	
+	private func startSession(_ duration: TimerDuration) {
+		performAndDismissMenu {
+			viewModel.start(duration: duration)
+		}
 	}
 	
 	private func performAndDismissMenu(_ action: () -> Void) {

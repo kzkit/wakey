@@ -119,7 +119,7 @@ final class WakeyViewModelTests: XCTestCase {
 	func testStartTimedSessionShowsRemainingTimeAndCountsDown() {
 		let viewModel = makeViewModel()
 		
-		viewModel.start(duration: .oneMinute)
+		viewModel.start(duration: .minutes(1))
 		advanceCountdown(of: viewModel, by: 1)
 		
 		XCTAssertTrue(viewModel.isActive)
@@ -128,10 +128,81 @@ final class WakeyViewModelTests: XCTestCase {
 		XCTAssertEqual(notificationSender.timerEndedCallCount, 0)
 	}
 	
+	func testCountdownShowsHoursWhenAnHourOrMoreRemains() {
+		let viewModel = makeViewModel()
+		
+		viewModel.start(duration: .twoHours)
+		XCTAssertEqual(viewModel.statusText, "2:00:00")
+		
+		advanceCountdown(of: viewModel, by: 1)
+		XCTAssertEqual(viewModel.statusText, "1:59:59")
+		
+		advanceCountdown(of: viewModel, by: 3599)
+		XCTAssertEqual(viewModel.remainingSeconds, 3600)
+		XCTAssertEqual(viewModel.statusText, "1:00:00")
+		
+		advanceCountdown(of: viewModel, by: 1)
+		XCTAssertEqual(viewModel.statusText, "59:59")
+	}
+	
+	func testStartCustomDurationCountsDownFromThatLength() {
+		let viewModel = makeViewModel()
+		
+		viewModel.start(duration: TimerDuration.custom(hours: 23, minutes: 59)!)
+		
+		XCTAssertTrue(viewModel.isActive)
+		XCTAssertTrue(viewModel.canStop)
+		XCTAssertEqual(viewModel.remainingSeconds, 86_340)
+		XCTAssertEqual(viewModel.statusText, "23:59:00")
+	}
+	
+	func testStartWithNonPositiveCountdownIsIgnored() {
+		let viewModel = makeViewModel()
+		
+		viewModel.start(duration: .timed(seconds: 0))
+		
+		XCTAssertFalse(viewModel.isActive)
+		XCTAssertFalse(viewModel.canStop)
+		XCTAssertEqual(sleepManager.preventSleepCallCount, 0)
+	}
+	
+	func testLastCustomMinutesDefaultsWhenUnset() {
+		let viewModel = makeViewModel()
+		
+		XCTAssertEqual(viewModel.lastCustomMinutes, WakeyViewModel.defaultCustomMinutes)
+	}
+	
+	func testLastCustomMinutesPersists() {
+		let viewModel = makeViewModel()
+		
+		viewModel.setLastCustomMinutes(95)
+		let reloadedViewModel = makeViewModel()
+		
+		XCTAssertEqual(viewModel.lastCustomMinutes, 95)
+		XCTAssertEqual(reloadedViewModel.lastCustomMinutes, 95)
+	}
+	
+	func testLastCustomMinutesIgnoresOutOfRangeValues() {
+		let viewModel = makeViewModel()
+		
+		viewModel.setLastCustomMinutes(0)
+		viewModel.setLastCustomMinutes(24 * 60)
+		
+		XCTAssertEqual(viewModel.lastCustomMinutes, WakeyViewModel.defaultCustomMinutes)
+	}
+	
+	func testInvalidStoredCustomMinutesFallBackToDefault() {
+		viewModelDefaults.set(24 * 60, forKey: "lastCustomMinutes")
+		
+		let viewModel = makeViewModel()
+		
+		XCTAssertEqual(viewModel.lastCustomMinutes, WakeyViewModel.defaultCustomMinutes)
+	}
+	
 	func testCountdownEndingSendsNotificationAndStopsManualSession() {
 		let viewModel = makeViewModel()
 		
-		viewModel.start(duration: .oneMinute)
+		viewModel.start(duration: .minutes(1))
 		for _ in 0..<60 {
 			advanceCountdown(of: viewModel, by: 1)
 		}
@@ -147,7 +218,7 @@ final class WakeyViewModelTests: XCTestCase {
 	func testCountdownFollowsWallClockWhenTicksAreDelayed() {
 		let viewModel = makeViewModel()
 		
-		viewModel.start(duration: .oneMinute)
+		viewModel.start(duration: .minutes(1))
 		advanceCountdown(of: viewModel, by: 19)
 		
 		XCTAssertEqual(viewModel.remainingSeconds, 41)
@@ -157,7 +228,7 @@ final class WakeyViewModelTests: XCTestCase {
 	func testCountdownIgnoresWallClockMovingBackwards() {
 		let viewModel = makeViewModel()
 		
-		viewModel.start(duration: .tenMinutes)
+		viewModel.start(duration: .minutes(10))
 		advanceCountdown(of: viewModel, by: 60)
 		now = now.addingTimeInterval(-3600)
 		viewModel.advanceCountdownForTesting()
@@ -168,7 +239,7 @@ final class WakeyViewModelTests: XCTestCase {
 	func testCountdownEndsOnFirstTickAfterDeadlinePasses() {
 		let viewModel = makeViewModel()
 		
-		viewModel.start(duration: .fiveMinutes)
+		viewModel.start(duration: .minutes(5))
 		advanceCountdown(of: viewModel, by: 600)
 		
 		XCTAssertFalse(viewModel.isActive)
@@ -181,7 +252,7 @@ final class WakeyViewModelTests: XCTestCase {
 		let appMonitor = makeAppMonitor()
 		let viewModel = makeViewModel(schedulerManager: scheduler, appMonitor: appMonitor)
 		
-		viewModel.start(duration: .oneMinute)
+		viewModel.start(duration: .minutes(1))
 		scheduler.updateSchedule(Schedule(isEnabled: true, startHour: 9, endHour: 17))
 		advanceCountdown(of: viewModel, by: 60)
 		
