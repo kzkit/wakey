@@ -12,6 +12,8 @@ struct MenuContentView: View {
 	@ObservedObject var viewModel: WakeyViewModel
 	@ObservedObject private var softwareUpdateManager = SoftwareUpdateManager.shared
 	@Environment(\.dismiss) private var dismiss
+	@State private var pendingBatteryStart: PendingBatteryStart?
+	@State private var isEditingCustomDuration = false
 	
 	var body: some View {
 		VStack(alignment: .leading, spacing: 0) {
@@ -26,6 +28,9 @@ struct MenuContentView: View {
 					activeControl
 					menuDivider
 				}
+			} else if let pendingBatteryStart {
+				batteryConfirmation(for: pendingBatteryStart)
+				menuDivider
 			} else {
 				timerSection
 				menuDivider
@@ -35,7 +40,16 @@ struct MenuContentView: View {
 		}
 		.padding(.vertical, 14)
 		.frame(width: 300)
-		.background(.regularMaterial)
+		.windowContentBackground()
+		.onDisappear {
+			pendingBatteryStart = nil
+		}
+		.onChange(of: viewModel.batteryGuardReason) { _, reason in
+			// Plugged in or Low Power Mode turned off while asking: there's nothing left to confirm.
+			if reason == nil {
+				pendingBatteryStart = nil
+			}
+		}
 	}
 	
 	private var header: some View {
@@ -58,8 +72,8 @@ struct MenuContentView: View {
 			NativeMenuRow(
 				title: statusTitle,
 				detail: statusDetail,
-				systemImage: viewModel.isActive ? "bolt.fill" : "moon.zzz.fill",
-				tint: viewModel.isActive ? .yellow : .secondary
+				systemImage: statusSystemImage,
+				tint: statusTint
 			)
 		}
 	}
@@ -69,6 +83,9 @@ struct MenuContentView: View {
 			sectionTitle(L10n.string("Quick Start"))
 			
 			timerControls
+		}
+		.onDisappear {
+			isEditingCustomDuration = false
 		}
 	}
 	
@@ -86,19 +103,86 @@ struct MenuContentView: View {
 	
 	private var timerControls: some View {
 		VStack(spacing: 2) {
-			ForEach(TimerDuration.allCases) { duration in
-				NativeMenuRowButton(
-					title: duration.displayName,
-					detail: timerDetail(for: duration),
-					systemImage: duration == .forever ? "infinity" : "timer",
-					tint: .primary,
-					action: {
+			ForEach(TimerDuration.timedPresets) { duration in
+				timerRow(for: duration)
+			}
+			
+			customDurationControl
+			
+			timerRow(for: .forever)
+		}
+	}
+	
+	private func timerRow(for duration: TimerDuration) -> some View {
+		NativeMenuRowButton(
+			title: duration.displayName,
+			detail: timerDetail(for: duration),
+			systemImage: duration == .forever ? "infinity" : "timer",
+			tint: .primary,
+			action: {
+				startSession(duration)
+			}
+		)
+	}
+	
+	@ViewBuilder
+	private var customDurationControl: some View {
+		NativeMenuRowButton(
+			title: L10n.string("Custom…"),
+			detail: nil,
+			systemImage: "slider.horizontal.3",
+			tint: .primary,
+			action: {
+				isEditingCustomDuration.toggle()
+			}
+		)
+		
+		if isEditingCustomDuration {
+			CustomDurationEditor(
+				initialMinutes: viewModel.lastCustomMinutes,
+				onStart: { minutes in
+					viewModel.setLastCustomMinutes(minutes)
+					isEditingCustomDuration = false
+					startSession(.minutes(minutes))
+				},
+				onCancel: {
+					isEditingCustomDuration = false
+				}
+			)
+		}
+	}
+	
+	private func batteryConfirmation(for pendingStart: PendingBatteryStart) -> some View {
+		VStack(alignment: .leading, spacing: 10) {
+			NativeMenuRow(
+				title: L10n.string("Stay awake anyway?"),
+				// When paused, the status row above already states the reason.
+				detail: viewModel.isPausedForLowBattery ? nil : (viewModel.batteryGuardReason ?? pendingStart.reason).message,
+				systemImage: "battery.25",
+				tint: .orange
+			)
+			
+			GlassGroup {
+				HStack(spacing: 8) {
+					Spacer(minLength: 0)
+					
+					Button(L10n.string("Cancel")) {
+						pendingBatteryStart = nil
+					}
+					.keyboardShortcut(.cancelAction)
+					.secondaryActionButtonStyle()
+					
+					Button(L10n.string("Stay Awake")) {
+						pendingBatteryStart = nil
 						performAndDismissMenu {
-							viewModel.start(duration: duration)
+							pendingStart.start(true)
 						}
 					}
-				)
+					.keyboardShortcut(.defaultAction)
+					.primaryActionButtonStyle()
+				}
 			}
+			.padding(.horizontal, 16)
 		}
 	}
 	
@@ -151,6 +235,10 @@ struct MenuContentView: View {
 	}
 	
 	private var statusTitle: String {
+		if !viewModel.isActive && viewModel.isPausedForLowBattery {
+			return L10n.string("Paused — low battery")
+		}
+		
 		guard viewModel.isActive else {
 			return L10n.string("Inactive")
 		}
@@ -163,11 +251,31 @@ struct MenuContentView: View {
 	}
 	
 	private var statusDetail: String? {
+		if !viewModel.isActive && viewModel.isPausedForLowBattery {
+			return viewModel.batteryGuardReason?.message
+		}
+		
 		guard viewModel.isActive else {
 			return L10n.string("Choose a duration to keep your Mac awake.")
 		}
 		
 		return viewModel.statusText
+	}
+	
+	private var statusSystemImage: String {
+		if viewModel.isActive {
+			return "bolt.fill"
+		}
+		
+		return viewModel.isPausedForLowBattery ? "battery.25" : "moon.zzz.fill"
+	}
+	
+	private var statusTint: Color {
+		if viewModel.isActive {
+			return .yellow
+		}
+		
+		return viewModel.isPausedForLowBattery ? .orange : .secondary
 	}
 	
 	private func sectionTitle(_ title: String) -> some View {
@@ -181,10 +289,35 @@ struct MenuContentView: View {
 		duration == .forever ? L10n.string("Until you stop it.") : nil
 	}
 	
+	private func startSession(_ duration: TimerDuration) {
+		requestStart { confirmedLowBattery in
+			viewModel.start(duration: duration, confirmedLowBattery: confirmedLowBattery)
+		}
+	}
+	
 	private func performAndDismissMenu(_ action: () -> Void) {
 		action()
 		dismiss()
 	}
+	
+	/// Gate for every manual start: while the battery guard applies, ask inside the menu first.
+	/// The start is passed in, so any start button can share it, and a start the user confirms is exempt from the guard.
+	private func requestStart(_ start: @escaping (Bool) -> Void) {
+		guard let reason = viewModel.batteryGuardReason else {
+			performAndDismissMenu {
+				start(false)
+			}
+			return
+		}
+		
+		pendingBatteryStart = PendingBatteryStart(reason: reason, start: start)
+	}
+}
+
+private struct PendingBatteryStart {
+	let reason: BatteryGuardReason
+	/// Starts the session; the argument says whether the user confirmed it despite low battery.
+	let start: (Bool) -> Void
 }
 
 private struct FooterMenuRowButton: View {
@@ -284,11 +417,7 @@ private struct NativeRowButtonStyle: ButtonStyle {
 		
 		var body: some View {
 			configuration.label
-				.background(
-					RoundedRectangle(cornerRadius: 12, style: .continuous)
-						.fill(backgroundColor)
-						.padding(.horizontal, 8)
-				)
+				.rowHighlight(backgroundColor, cornerRadius: 12, horizontalInset: 8)
 				.scaleEffect(configuration.isPressed ? 0.985 : 1)
 				.animation(.snappy(duration: 0.14), value: configuration.isPressed)
 				.animation(.easeInOut(duration: 0.12), value: isHovered)
@@ -297,10 +426,10 @@ private struct NativeRowButtonStyle: ButtonStyle {
 		
 		private var backgroundColor: Color {
 			if configuration.isPressed {
-				return Color.primary.opacity(0.12)
+				return SystemFill.primary.color(fallbackOpacity: 0.12)
 			}
 			
-			return isHovered ? Color.primary.opacity(0.08) : .clear
+			return isHovered ? SystemFill.secondary.color(fallbackOpacity: 0.08) : .clear
 		}
 	}
 }

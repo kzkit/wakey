@@ -9,7 +9,7 @@ Wakey is a lightweight macOS menu bar app for keeping your Mac awake without lea
 ## What It Does
 
 - Start and stop wake control from the menu bar.
-- Use quick timers for `1 minute`, `5 minutes`, `10 minutes`, or `Forever`.
+- Use quick timers for `15 minutes`, `30 minutes`, `1 hour`, `2 hours`, or `Forever`, or set a custom duration of up to 23 h 59 m.
 - Keep your Mac awake during scheduled hours.
 - Automatically stay awake while selected apps are running.
 

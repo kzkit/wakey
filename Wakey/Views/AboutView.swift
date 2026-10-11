@@ -38,7 +38,7 @@ struct AboutView: View {
 		.padding(.horizontal, 28)
 		.padding(.vertical, 18)
 		.frame(width: 300, height: 300)
-		.background(.regularMaterial)
+		.windowContentBackground()
 	}
 	
 	private var appName: String {

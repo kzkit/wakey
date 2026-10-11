@@ -7,22 +7,98 @@
 
 import Foundation
 
-struct Schedule: Codable, Equatable {
-	var isEnabled: Bool
-	var startHour: Int
-	var endHour: Int
+struct Schedule: Equatable {
+	static let minutesPerDay = 24 * 60
+	static let minuteStep = 30
+	/// `Calendar` weekday numbers: 1 = Sunday … 7 = Saturday.
+	static let allWeekdays: Set<Int> = Set(1...7)
+	static let workWeekdays: Set<Int> = Set(2...6)
 	
-	static let `default` = Schedule(isEnabled: false, startHour: 9, endHour: 17)
+	var isEnabled: Bool
+	/// Minutes since midnight.
+	var startMinute: Int
+	/// Minutes since midnight. A window ending at or before its start runs past midnight; start == end means a full 24 hours.
+	var endMinute: Int
+	/// Days the window starts on. Overnight windows belong to the day they start.
+	var weekdays: Set<Int>
+	
+	static let `default` = Schedule(isEnabled: false, startHour: 9, endHour: 17, weekdays: workWeekdays)
+	
+	/// `weekdays` defaults to every day, matching schedules saved before weekdays existed.
+	init(isEnabled: Bool, startMinute: Int, endMinute: Int, weekdays: Set<Int> = Schedule.allWeekdays) {
+		self.isEnabled = isEnabled
+		self.startMinute = startMinute
+		self.endMinute = endMinute
+		self.weekdays = weekdays
+	}
+	
+	init(isEnabled: Bool, startHour: Int, endHour: Int, weekdays: Set<Int> = Schedule.allWeekdays) {
+		self.init(isEnabled: isEnabled, startMinute: startHour * 60, endMinute: endHour * 60, weekdays: weekdays)
+	}
+	
+	/// Every selectable start/end time, in minutes since midnight.
+	static var selectableMinutes: [Int] {
+		Array(stride(from: 0, to: minutesPerDay, by: minuteStep))
+	}
+	
+	/// Weekday numbers in display order, starting from the calendar's first weekday.
+	static func orderedWeekdays(firstWeekday: Int) -> [Int] {
+		(0..<7).map { (firstWeekday - 1 + $0) % 7 + 1 }
+	}
 	
 	func isWithinSchedule(at date: Date = Date(), calendar: Calendar = .current) -> Bool {
 		guard isEnabled else { return false }
 		
-		let hour = calendar.component(.hour, from: date)
+		let components = calendar.dateComponents([.weekday, .hour, .minute], from: date)
+		guard let weekday = components.weekday else { return false }
+		let minute = (components.hour ?? 0) * 60 + (components.minute ?? 0)
+		let previousWeekday = (weekday + 5) % 7 + 1
 		
-		if startHour < endHour {
-			return hour >= startHour && hour < endHour
+		if startMinute < endMinute {
+			return weekdays.contains(weekday) && minute >= startMinute && minute < endMinute
 		} else {
-			return hour >= startHour || hour < endHour
+			// Runs past midnight: the early-morning part belongs to the previous day's window.
+			return (weekdays.contains(weekday) && minute >= startMinute)
+				|| (weekdays.contains(previousWeekday) && minute < endMinute)
 		}
+	}
+}
+
+extension Schedule: Codable {
+	private enum CodingKeys: String, CodingKey {
+		case isEnabled
+		case startMinute
+		case endMinute
+		case weekdays
+		// Read-only: written by earlier versions, which had whole hours and no weekdays.
+		case startHour
+		case endHour
+	}
+	
+	init(from decoder: Decoder) throws {
+		let container = try decoder.container(keyedBy: CodingKeys.self)
+		isEnabled = try container.decode(Bool.self, forKey: .isEnabled)
+		
+		if let startMinute = try container.decodeIfPresent(Int.self, forKey: .startMinute) {
+			self.startMinute = startMinute
+		} else {
+			startMinute = try container.decode(Int.self, forKey: .startHour) * 60
+		}
+		
+		if let endMinute = try container.decodeIfPresent(Int.self, forKey: .endMinute) {
+			self.endMinute = endMinute
+		} else {
+			endMinute = try container.decode(Int.self, forKey: .endHour) * 60
+		}
+		
+		weekdays = try container.decodeIfPresent(Set<Int>.self, forKey: .weekdays) ?? Self.allWeekdays
+	}
+	
+	func encode(to encoder: Encoder) throws {
+		var container = encoder.container(keyedBy: CodingKeys.self)
+		try container.encode(isEnabled, forKey: .isEnabled)
+		try container.encode(startMinute, forKey: .startMinute)
+		try container.encode(endMinute, forKey: .endMinute)
+		try container.encode(weekdays.sorted(), forKey: .weekdays)
 	}
 }

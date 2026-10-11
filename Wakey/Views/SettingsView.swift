@@ -38,7 +38,7 @@ struct SettingsView: View {
 			}
 		}
 		.frame(width: 460, height: 560)
-		.background(.regularMaterial)
+		.windowContentBackground()
 		.background(SettingsWindowAccessor())
 		.onAppear {
 			syncSavedValues()
@@ -64,6 +64,16 @@ struct SettingsView: View {
 
 				SettingsDivider()
 				displayTurnOffRow
+				
+				if viewModel.hasBattery {
+					SettingsDivider()
+					batteryGuardRow
+					
+					if viewModel.isBatteryGuardEnabled {
+						SettingsDivider()
+						batteryThresholdRow
+					}
+				}
 				
 				if launchAtLoginManager.requiresApproval {
 					SettingsDivider()
@@ -139,6 +149,59 @@ struct SettingsView: View {
 		.padding(.vertical, 10)
 	}
 	
+	private var batteryGuardRow: some View {
+		HStack(spacing: 12) {
+			Image(systemName: "battery.25")
+				.font(.system(size: 15, weight: .semibold))
+				.frame(width: 24, height: 24)
+
+			VStack(alignment: .leading, spacing: 2) {
+				Text("Battery guard")
+					.font(.callout)
+
+				Text("Let your Mac sleep when the battery is low or Low Power Mode is on.")
+					.font(.caption)
+					.foregroundStyle(.secondary)
+			}
+
+			Spacer(minLength: 0)
+
+			Toggle("", isOn: Binding(
+				get: { viewModel.isBatteryGuardEnabled },
+				set: { viewModel.setBatteryGuardEnabled($0) }
+			))
+			.labelsHidden()
+			.toggleStyle(.switch)
+		}
+		.padding(.horizontal, 14)
+		.padding(.vertical, 10)
+	}
+
+	private var batteryThresholdRow: some View {
+		HStack(spacing: 12) {
+			Image(systemName: "gauge.with.dots.needle.33percent")
+				.font(.system(size: 15, weight: .semibold))
+				.frame(width: 24, height: 24)
+
+			Text("Low battery level")
+				.font(.callout)
+
+			Spacer(minLength: 0)
+
+			ValueMenu(title: L10n.format("%lld%%", viewModel.batteryGuardThreshold)) {
+				ForEach(BatteryGuard.thresholdOptions, id: \.self) { threshold in
+					Button(L10n.format("%lld%%", threshold)) {
+						viewModel.setBatteryGuardThreshold(threshold)
+					}
+				}
+			}
+			.fixedSize()
+		}
+		.padding(.horizontal, 14)
+		.padding(.vertical, 10)
+		.transition(.opacity.combined(with: .move(edge: .top)))
+	}
+	
 	private var launchAtLoginApprovalRow: some View {
 		HStack(spacing: 12) {
 			Image(systemName: "checkmark.shield.fill")
@@ -176,6 +239,9 @@ struct SettingsView: View {
 				scheduleToggleRow
 				
 				if schedule.isEnabled {
+					SettingsDivider()
+					activeDaysRow
+					
 					SettingsDivider()
 					activeHoursRow
 				}
@@ -222,16 +288,18 @@ struct SettingsView: View {
 			Spacer(minLength: 0)
 			
 			HStack(spacing: 8) {
-				hourMenu(selectedHour: schedule.startHour) { selectedHour in
-					updateSchedule(startHour: selectedHour)
+				timeMenu(selectedMinute: schedule.startMinute) { selectedMinute in
+					updateSchedule(startMinute: selectedMinute)
 				}
 				
 				Text("to")
 					.font(.callout)
 					.foregroundStyle(.secondary)
+					// The system menu buttons on macOS 26+ otherwise squeeze this label to nothing.
+					.fixedSize()
 				
-				hourMenu(selectedHour: schedule.endHour) { selectedHour in
-					updateSchedule(endHour: selectedHour)
+				timeMenu(selectedMinute: schedule.endMinute) { selectedMinute in
+					updateSchedule(endMinute: selectedMinute)
 				}
 			}
 		}
@@ -240,16 +308,82 @@ struct SettingsView: View {
 		.transition(.opacity.combined(with: .move(edge: .top)))
 	}
 	
+	private var activeDaysRow: some View {
+		HStack(alignment: .top, spacing: 12) {
+			Image(systemName: "calendar")
+				.font(.system(size: 15, weight: .semibold))
+				.frame(width: 24, height: 24)
+			
+			VStack(alignment: .leading, spacing: 8) {
+				Text("Active days")
+					.font(.callout)
+					.frame(minHeight: 24)
+				
+				// Zero spacing keeps neighbouring chips from melting into each other at rest.
+				GlassGroup(spacing: 0) {
+					HStack(spacing: 6) {
+						ForEach(Schedule.orderedWeekdays(firstWeekday: Calendar.current.firstWeekday), id: \.self) { weekday in
+							weekdayChip(weekday)
+						}
+					}
+				}
+				
+				if schedule.weekdays.isEmpty {
+					Text("Choose at least one day, or the schedule won't run.")
+						.font(.caption)
+						.foregroundStyle(.orange)
+						.fixedSize(horizontal: false, vertical: true)
+				}
+			}
+			.frame(maxWidth: .infinity, alignment: .leading)
+		}
+		.padding(.horizontal, 14)
+		.padding(.vertical, 10)
+		.transition(.opacity.combined(with: .move(edge: .top)))
+	}
+	
+	/// Names days in Wakey's own language, which can differ from the region's when a per-app language is set.
+	/// The order of days still follows the region via `Calendar.current.firstWeekday`.
+	private var weekdaySymbolCalendar: Calendar {
+		var calendar = Calendar.current
+		if let language = Bundle.main.preferredLocalizations.first {
+			calendar.locale = Locale(identifier: language)
+		}
+		return calendar
+	}
+	
+	private func weekdayChip(_ weekday: Int) -> some View {
+		let calendar = weekdaySymbolCalendar
+		let isSelected = schedule.weekdays.contains(weekday)
+		
+		return Button {
+			toggleWeekday(weekday)
+		} label: {
+			Text(calendar.shortStandaloneWeekdaySymbols[weekday - 1])
+				.font(.subheadline.weight(isSelected ? .semibold : .regular))
+				.lineLimit(1)
+				.frame(maxWidth: .infinity, minHeight: 26)
+				.chipStyle(isSelected: isSelected, tint: wakeyColor)
+				.contentShape(Capsule(style: .continuous))
+		}
+		.buttonStyle(.plain)
+		.accessibilityLabel(calendar.standaloneWeekdaySymbols[weekday - 1])
+		.accessibilityAddTraits(isSelected ? .isSelected : [])
+		.animation(.snappy(duration: 0.16), value: isSelected)
+	}
+	
 	private var scheduleActiveRow: some View {
-		HStack(spacing: 12) {
-			Image(systemName: "checkmark")
+		let isPausedForLowBattery = viewModel.batteryGuardReason != nil
+		
+		return HStack(spacing: 12) {
+			Image(systemName: isPausedForLowBattery ? "pause.fill" : "checkmark")
 				.font(.system(size: 15, weight: .semibold))
 				.frame(width: 24, height: 24)
 			VStack(alignment: .leading, spacing: 2) {
-				Text("Schedule active now")
+				Text(L10n.string(isPausedForLowBattery ? "Schedule paused — low battery" : "Schedule active now"))
 					.font(.callout)
 				
-				Text("Wakey is currently preventing sleep from this rule.")
+				Text(L10n.string(isPausedForLowBattery ? "Resumes automatically when the battery is no longer low." : "Wakey is currently preventing sleep from this rule."))
 					.font(.caption)
 					.foregroundStyle(.secondary)
 			}
@@ -341,23 +475,38 @@ struct SettingsView: View {
 	
 	private func updateSchedule(
 		isEnabled: Bool? = nil,
-		startHour: Int? = nil,
-		endHour: Int? = nil
+		startMinute: Int? = nil,
+		endMinute: Int? = nil,
+		weekdays: Set<Int>? = nil
 	) {
 		var updatedSchedule = schedule
 		if let isEnabled {
 			updatedSchedule.isEnabled = isEnabled
 		}
-		if let startHour {
-			updatedSchedule.startHour = startHour
+		if let startMinute {
+			updatedSchedule.startMinute = startMinute
 		}
-		if let endHour {
-			updatedSchedule.endHour = endHour
+		if let endMinute {
+			updatedSchedule.endMinute = endMinute
+		}
+		if let weekdays {
+			updatedSchedule.weekdays = weekdays
 		}
 		
 		schedule = updatedSchedule
 		viewModel.schedulerManager.updateSchedule(updatedSchedule)
 		viewModel.refreshState()
+	}
+	
+	private func toggleWeekday(_ weekday: Int) {
+		var weekdays = schedule.weekdays
+		if weekdays.contains(weekday) {
+			weekdays.remove(weekday)
+		} else {
+			weekdays.insert(weekday)
+		}
+		
+		updateSchedule(weekdays: weekdays)
 	}
 	
 	private func toggleWatchedApp(bundleIdentifier: String, isWatched: Bool) {
@@ -372,30 +521,18 @@ struct SettingsView: View {
 		refreshListedApps()
 	}
 	
-	private func hourMenu(selectedHour: Int, onSelect: @escaping (Int) -> Void) -> some View {
-		Menu {
-			ForEach(0..<24, id: \.self) { hour in
-				Button(String(format: "%02d:00", hour)) {
-					onSelect(hour)
+	private func timeMenu(selectedMinute: Int, onSelect: @escaping (Int) -> Void) -> some View {
+		ValueMenu(title: timeLabel(selectedMinute)) {
+			ForEach(Schedule.selectableMinutes, id: \.self) { minute in
+				Button(timeLabel(minute)) {
+					onSelect(minute)
 				}
 			}
-		} label: {
-			HStack(spacing: 6) {
-				Text(String(format: "%02d:00", selectedHour))
-					.monospacedDigit()
-				
-				Image(systemName: "chevron.up.chevron.down")
-					.font(.caption2.weight(.semibold))
-					.foregroundStyle(.secondary)
-			}
-			.padding(.horizontal, 9)
-			.padding(.vertical, 5)
-			.background(
-				RoundedRectangle(cornerRadius: 7, style: .continuous)
-					.fill(Color.primary.opacity(0.06))
-			)
 		}
-		.menuStyle(.borderlessButton)
+	}
+	
+	private func timeLabel(_ minute: Int) -> String {
+		String(format: "%02d:%02d", minute / 60, minute % 60)
 	}
 	
 	private var categorizedApps: (watched: [InstalledApp], available: [InstalledApp], isEmpty: Bool) {
@@ -534,11 +671,46 @@ private struct SettingsGroup<Content: View>: View {
 		VStack(spacing: 0) {
 			content
 		}
-		.background(
-			RoundedRectangle(cornerRadius: 14, style: .continuous)
-				.fill(Color.primary.opacity(0.045))
-		)
-		.clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+		.groupBackground(cornerRadius: 14, fallbackOpacity: 0.045)
+	}
+}
+
+/// A compact menu showing the selected value. On macOS 26+ it's the system menu button, which draws its own bezel
+/// and indicator; a borderless menu there drops the hand-drawn pill and shows the chevron next to the system one.
+private struct ValueMenu<Items: View>: View {
+	let title: String
+	@ViewBuilder let items: Items
+	
+	var body: some View {
+		if #available(macOS 26.0, *) {
+			Menu {
+				items
+			} label: {
+				Text(title)
+					.monospacedDigit()
+			}
+			.fixedSize()
+		} else {
+			Menu {
+				items
+			} label: {
+				HStack(spacing: 6) {
+					Text(title)
+						.monospacedDigit()
+					
+					Image(systemName: "chevron.up.chevron.down")
+						.font(.caption2.weight(.semibold))
+						.foregroundStyle(.secondary)
+				}
+				.padding(.horizontal, 9)
+				.padding(.vertical, 5)
+				.background(
+					RoundedRectangle(cornerRadius: 7, style: .continuous)
+						.fill(Color.primary.opacity(0.06))
+				)
+			}
+			.menuStyle(.borderlessButton)
+		}
 	}
 }
 
@@ -577,12 +749,8 @@ private struct AppSelectionRow: View {
 			.padding(.horizontal, 14)
 			.padding(.vertical, 9)
 			.frame(maxWidth: .infinity, alignment: .leading)
-			.background(
-				RoundedRectangle(cornerRadius: 10, style: .continuous)
-					.fill(rowBackground)
-					.padding(.horizontal, 6)
-					.padding(.vertical, 3)
-			)
+			// On macOS 26+ the highlight is concentric with the group (its 14 pt radius minus the 6 pt inset).
+			.rowHighlight(rowBackground, cornerRadius: 10, minimumConcentricRadius: 8, horizontalInset: 6, verticalInset: 3)
 			.contentShape(Rectangle())
 		}
 		.buttonStyle(.plain)
@@ -610,7 +778,7 @@ private struct AppSelectionRow: View {
 			return accentColor.opacity(isHovered ? 0.16 : 0.11)
 		}
 		
-		return isHovered ? Color.primary.opacity(0.07) : .clear
+		return isHovered ? SystemFill.secondary.color(fallbackOpacity: 0.07) : .clear
 	}
 }
 

@@ -13,10 +13,15 @@ final class WakeyViewModel: ObservableObject {
 	@Published private(set) var isActive = false
 	@Published private(set) var remainingSeconds: TimeInterval?
 	@Published private(set) var letsDisplayTurnOff: Bool
+	@Published private(set) var isBatteryGuardEnabled: Bool
+	@Published private(set) var batteryGuardThreshold: Int
+	/// Prefills the custom duration editor with the last custom length the user started.
+	@Published private(set) var lastCustomMinutes: Int
 	
 	let schedulerManager: SchedulerManager
 	let appMonitor: AppMonitor
 	let launchAtLoginManager: LaunchAtLoginManager
+	let batteryMonitor: BatteryMonitor
 	private let sleepManager: SleepManaging
 	private let notificationSender: NotificationSending
 	private let startsCountdownTimers: Bool
@@ -26,16 +31,25 @@ final class WakeyViewModel: ObservableObject {
 	private var timerCancellable: AnyCancellable?
 	private var cancellables = Set<AnyCancellable>()
 	private var manualTimerActive = false
+	@Published private var batteryState: BatteryState
+	/// Set when the user confirmed (or kept) a manual session while the battery guard already applied.
+	private var manualSessionIgnoresBatteryGuard = false
 
 	private enum DefaultsKey {
 		static let letsDisplayTurnOff = "letsDisplayTurnOff"
+		static let batteryGuardEnabled = "batteryGuardEnabled"
+		static let batteryGuardThreshold = "batteryGuardThreshold"
+		static let lastCustomMinutes = "lastCustomMinutes"
 	}
+	
+	static let defaultCustomMinutes = 45
 	
 	convenience init() {
 		self.init(
 			schedulerManager: SchedulerManager(),
 			appMonitor: AppMonitor(),
 			launchAtLoginManager: LaunchAtLoginManager(),
+			batteryMonitor: BatteryMonitor(),
 			sleepManager: SleepManager(),
 			notificationSender: NotificationManager.shared,
 			startsCountdownTimers: true
@@ -46,6 +60,7 @@ final class WakeyViewModel: ObservableObject {
 		schedulerManager: SchedulerManager,
 		appMonitor: AppMonitor,
 		launchAtLoginManager: LaunchAtLoginManager,
+		batteryMonitor: BatteryMonitor,
 		sleepManager: SleepManaging,
 		notificationSender: NotificationSending,
 		startsCountdownTimers: Bool,
@@ -55,12 +70,21 @@ final class WakeyViewModel: ObservableObject {
 		self.schedulerManager = schedulerManager
 		self.appMonitor = appMonitor
 		self.launchAtLoginManager = launchAtLoginManager
+		self.batteryMonitor = batteryMonitor
 		self.sleepManager = sleepManager
 		self.notificationSender = notificationSender
 		self.startsCountdownTimers = startsCountdownTimers
 		self.defaults = defaults
 		self.now = now
 		letsDisplayTurnOff = defaults.bool(forKey: DefaultsKey.letsDisplayTurnOff)
+		isBatteryGuardEnabled = defaults.bool(forKey: DefaultsKey.batteryGuardEnabled)
+		let savedThreshold = defaults.integer(forKey: DefaultsKey.batteryGuardThreshold)
+		batteryGuardThreshold = BatteryGuard.thresholdOptions.contains(savedThreshold) ? savedThreshold : BatteryGuard.defaultThreshold
+		batteryState = batteryMonitor.state
+		let storedCustomMinutes = defaults.integer(forKey: DefaultsKey.lastCustomMinutes)
+		lastCustomMinutes = TimerDuration.customMinutesRange.contains(storedCustomMinutes)
+			? storedCustomMinutes
+			: Self.defaultCustomMinutes
 		
 		schedulerManager.$isActive
 			.combineLatest(appMonitor.$isActive)
@@ -71,10 +95,40 @@ final class WakeyViewModel: ObservableObject {
 				self?.updateSleepState(isScheduleActive: isScheduleActive, isAppActive: isAppActive)
 			}
 			.store(in: &cancellables)
+		
+		batteryMonitor.$state
+			.dropFirst()
+			.sink { [weak self] state in
+				self?.batteryStateDidChange(state)
+			}
+			.store(in: &cancellables)
 	}
 	
 	var canStop: Bool {
 		manualTimerActive
+	}
+	
+	/// Why the battery guard currently stops automatic triggers, or `nil` when it doesn't apply.
+	var batteryGuardReason: BatteryGuardReason? {
+		guard isBatteryGuardEnabled else { return nil }
+		
+		return BatteryGuard.lowBatteryReason(for: batteryState, threshold: batteryGuardThreshold)
+	}
+	
+	/// A manual start should ask before overriding the guard. The menu checks this first and passes
+	/// `confirmedLowBattery: true` to `start` once the user confirms.
+	var needsBatteryConfirmation: Bool {
+		batteryGuardReason != nil
+	}
+	
+	/// The schedule or a watched app would keep the Mac awake, but the battery guard is holding them back.
+	var isPausedForLowBattery: Bool {
+		batteryGuardReason != nil && (schedulerManager.isActive || appMonitor.isActive)
+	}
+	
+	/// The Mac has a battery, so the battery guard setting is relevant.
+	var hasBattery: Bool {
+		batteryState.hasBattery
 	}
 	
 	var statusText: String {
@@ -83,11 +137,19 @@ final class WakeyViewModel: ObservableObject {
 		return remainingSeconds.map(formattedStatusTime) ?? nonTimedStatusText
 	}
 	
-	func start(duration: TimerDuration) {
+	/// The single entry point for manual sessions, whether started from a preset, a custom duration, or `forever`.
+	/// Only a start the user confirmed despite low battery (`confirmedLowBattery`) is exempt from the battery guard.
+	func start(duration: TimerDuration, confirmedLowBattery: Bool = false) {
 		let seconds = duration.seconds
+		
+		// A zero or negative countdown would end immediately, so treat it as a no-op rather than starting a session.
+		if let seconds, seconds <= 0 {
+			return
+		}
 
 		resetTimer()
 		manualTimerActive = true
+		manualSessionIgnoresBatteryGuard = confirmedLowBattery
 		countdownDeadline = seconds.map { now().advanced(by: .seconds($0)) }
 		remainingSeconds = seconds
 		
@@ -106,6 +168,7 @@ final class WakeyViewModel: ObservableObject {
 	func stop() {
 		resetTimer()
 		manualTimerActive = false
+		manualSessionIgnoresBatteryGuard = false
 		countdownDeadline = nil
 		remainingSeconds = nil
 		updateSleepState()
@@ -142,14 +205,64 @@ final class WakeyViewModel: ObservableObject {
 		updateSleepState(forceRefresh: true)
 	}
 	
+	func setBatteryGuardEnabled(_ isEnabled: Bool) {
+		guard isBatteryGuardEnabled != isEnabled else { return }
+		
+		isBatteryGuardEnabled = isEnabled
+		defaults.set(isEnabled, forKey: DefaultsKey.batteryGuardEnabled)
+		batteryGuardSettingsDidChange()
+	}
+	
+	func setBatteryGuardThreshold(_ threshold: Int) {
+		guard batteryGuardThreshold != threshold, BatteryGuard.thresholdOptions.contains(threshold) else { return }
+		
+		batteryGuardThreshold = threshold
+		defaults.set(threshold, forKey: DefaultsKey.batteryGuardThreshold)
+		batteryGuardSettingsDidChange()
+	}
+	
+	/// Changing a setting never stops a running manual session; if the guard now applies, that session is treated as confirmed.
+	private func batteryGuardSettingsDidChange() {
+		if manualTimerActive && needsBatteryConfirmation {
+			manualSessionIgnoresBatteryGuard = true
+		}
+		updateSleepState()
+	}
+	
+	private func batteryStateDidChange(_ state: BatteryState) {
+		// `@Published` emits before the monitor stores the new value, so keep our own copy of the emitted state.
+		let wasLowBattery = BatteryGuard.lowBatteryReason(for: batteryState, threshold: batteryGuardThreshold) != nil
+		batteryState = state
+		
+		// Only the moment the battery becomes low stops a manual session; plugging back in doesn't restart it.
+		if !wasLowBattery,
+			 let reason = batteryGuardReason,
+			 manualTimerActive,
+			 !manualSessionIgnoresBatteryGuard {
+			stop()
+			notificationSender.sendBatteryGuardStoppedNotification(reason: reason)
+			return
+		}
+		
+		updateSleepState()
+	}
+	
+	func setLastCustomMinutes(_ minutes: Int) {
+		guard TimerDuration.customMinutesRange.contains(minutes), lastCustomMinutes != minutes else { return }
+		
+		lastCustomMinutes = minutes
+		defaults.set(minutes, forKey: DefaultsKey.lastCustomMinutes)
+	}
+	
 	private func updateSleepState(
 		forceRefresh: Bool = false,
 		isScheduleActive: Bool? = nil,
 		isAppActive: Bool? = nil
 	) {
-		let shouldBeActive = manualTimerActive
-			|| (isScheduleActive ?? schedulerManager.isActive)
+		let isAutomaticTriggerActive = (isScheduleActive ?? schedulerManager.isActive)
 			|| (isAppActive ?? appMonitor.isActive)
+		let shouldBeActive = manualTimerActive
+			|| (isAutomaticTriggerActive && batteryGuardReason == nil)
 		
 		if shouldBeActive {
 			if sleepManager.isActive && forceRefresh {
@@ -169,11 +282,13 @@ final class WakeyViewModel: ObservableObject {
 	}
 	
 	private var nonTimedStatusText: String {
-		if schedulerManager.isActive {
+		let areAutomaticTriggersAllowed = batteryGuardReason == nil
+		
+		if areAutomaticTriggersAllowed && schedulerManager.isActive {
 			return L10n.string("Scheduled run")
 		}
 		
-		if appMonitor.isActive {
+		if areAutomaticTriggersAllowed && appMonitor.isActive {
 			return L10n.string("App running")
 		}
 		
@@ -184,9 +299,17 @@ final class WakeyViewModel: ObservableObject {
 		letsDisplayTurnOff ? .allowDisplayOff : .keepDisplayAwake
 	}
 	
+	/// Shows `h:mm:ss` while an hour or more remains, `m:ss` otherwise.
 	private func formattedStatusTime(_ remaining: TimeInterval) -> String {
-		let mins = Int(remaining) / 60
-		let secs = Int(remaining) % 60
+		let totalSeconds = Int(remaining)
+		let hours = totalSeconds / 3600
+		let mins = totalSeconds % 3600 / 60
+		let secs = totalSeconds % 60
+		
+		if hours > 0 {
+			return String(format: "%d:%02d:%02d", hours, mins, secs)
+		}
+		
 		return String(format: "%d:%02d", mins, secs)
 	}
 	
