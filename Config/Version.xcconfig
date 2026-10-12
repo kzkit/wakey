@@ -1,0 +1,7 @@
+// Single source of truth for Wakey's version, shared by the Direct and App Store builds.
+// Set as the base configuration of every project-level build configuration; no target
+// overrides these. Change them with scripts/bump.sh rather than in Xcode's General tab,
+// which would write a target-level override back into project.pbxproj.
+
+MARKETING_VERSION = 1.0.3
+CURRENT_PROJECT_VERSION = 4
