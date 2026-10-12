@@ -755,6 +755,7 @@ private struct TimeOfDayField: NSViewRepresentable {
 
 private final class TimeOfDayPicker: NSDatePicker {
 	var onResignFirstResponder: (() -> Void)?
+	private var outsideClickMonitor: Any?
 	
 	/// Only reachable with Tab when Full Keyboard Access is on, like the switches around it. Otherwise AppKit would pick
 	/// it as the first field when Settings opens and a stray keypress would change the schedule.
@@ -762,12 +763,59 @@ private final class TimeOfDayPicker: NSDatePicker {
 		NSApp.isFullKeyboardAccessEnabled && super.canBecomeKeyView
 	}
 	
+	override func becomeFirstResponder() -> Bool {
+		let didBecome = super.becomeFirstResponder()
+		if didBecome {
+			startEndingEditingOnOutsideClicks()
+		}
+		return didBecome
+	}
+	
 	override func resignFirstResponder() -> Bool {
 		let didResign = super.resignFirstResponder()
 		if didResign {
+			stopEndingEditingOnOutsideClicks()
 			onResignFirstResponder?()
 		}
 		return didResign
+	}
+	
+	override func viewWillMove(toWindow newWindow: NSWindow?) {
+		super.viewWillMove(toWindow: newWindow)
+		if newWindow == nil {
+			stopEndingEditingOnOutsideClicks()
+		}
+	}
+	
+	/// Return finishes editing, like it does in a text field.
+	override func keyDown(with event: NSEvent) {
+		if event.keyCode == 36 || event.keyCode == 76 {
+			window?.makeFirstResponder(nil)
+		} else {
+			super.keyDown(with: event)
+		}
+	}
+	
+	/// Clicking elsewhere in a window doesn't take focus from a field by itself, so the hour or minute would stay
+	/// highlighted. While editing, any click outside the field ends editing; the click itself still goes through.
+	private func startEndingEditingOnOutsideClicks() {
+		guard outsideClickMonitor == nil else { return }
+		
+		outsideClickMonitor = NSEvent.addLocalMonitorForEvents(matching: .leftMouseDown) { [weak self] event in
+			guard let self, let window, event.window === window else { return event }
+			
+			if !bounds.contains(convert(event.locationInWindow, from: nil)) {
+				window.makeFirstResponder(nil)
+			}
+			return event
+		}
+	}
+	
+	private func stopEndingEditingOnOutsideClicks() {
+		if let outsideClickMonitor {
+			NSEvent.removeMonitor(outsideClickMonitor)
+			self.outsideClickMonitor = nil
+		}
 	}
 }
 
