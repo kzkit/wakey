@@ -72,6 +72,7 @@ check_can_publish() {
 
     local live_build
     live_build=$(sed -nE '/<sparkle:version>/{s|.*<sparkle:version>(.+)</sparkle:version>.*|\1|p;q;}' "$REPO_ROOT/appcast.xml")
+    [[ "$live_build" =~ ^[0-9]+$ ]] || die "couldn't read the build number (<sparkle:version>) from appcast.xml"
     ((build_number > live_build)) ||
         die "build $build_number is not above the live appcast's build $live_build, so Sparkle would not offer it; run scripts/bump.sh"
 }
@@ -214,10 +215,16 @@ publish_release() {
         --title "$tag" --notes-file "$out/notes.md"
     ok "GitHub release $tag created"
 
-    local served
-    served=$(curl -sfL "$download_url" | wc -c | tr -d ' ') || served=0
-    [[ "$served" == "$(stat -f %z "$zip")" ]] ||
-        die "downloaded $served bytes from $download_url, expected $(stat -f %z "$zip"); appcast NOT pushed"
+    # A just-uploaded asset can take a moment to be served, so retry before giving up.
+    local served expected attempt
+    expected=$(stat -f %z "$zip")
+    for attempt in 1 2 3 4 5 6; do
+        served=$(curl -sfL "$download_url" | wc -c | tr -d ' ') || served=0
+        [[ "$served" == "$expected" ]] && break
+        sleep 5
+    done
+    [[ "$served" == "$expected" ]] ||
+        die "downloaded $served bytes from $download_url, expected $expected; appcast NOT pushed"
 
     cp "$out/appcast.xml" "$REPO_ROOT/appcast.xml"
     git -C "$REPO_ROOT" commit --quiet -m "chore: release $tag" -- appcast.xml
@@ -228,8 +235,8 @@ publish_release() {
 if ((publish)); then
     check_can_publish
 fi
-check_keys
 if ((build)); then
+    check_keys
     build_release
 fi
 if ((publish)); then

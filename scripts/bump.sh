@@ -24,10 +24,10 @@ done
 old_version=$(read_setting MARKETING_VERSION)
 old_build=$(read_setting CURRENT_PROJECT_VERSION)
 new_version=${new_version:-$old_version}
-new_build=$((old_build + 1))
 
 [[ "$new_version" =~ ^[0-9]+(\.[0-9]+){1,2}$ ]] || die "version must look like 1.2 or 1.2.3, got '$new_version'"
-[[ "$old_build" =~ ^[0-9]+$ ]] || die "CURRENT_PROJECT_VERSION must be an integer, got '$old_build'"
+[[ "$old_build" =~ ^[1-9][0-9]*$ ]] || die "CURRENT_PROJECT_VERSION must be a positive integer, got '$old_build'"
+new_build=$((old_build + 1))
 if [[ "$new_version" != "$old_version" ]] &&
     [[ "$(printf '%s\n%s\n' "$old_version" "$new_version" | sort -V | tail -1)" != "$new_version" ]]; then
     die "$new_version is lower than the current $old_version"
