@@ -28,6 +28,27 @@ read_setting() {
     echo "$value"
 }
 
+# Releases ship what's on origin/main: on main, nothing uncommitted or untracked (files in Wakey/ are
+# compiled in automatically), and in sync with origin.
+check_clean_main() {
+    local branch
+    branch=$(git -C "$REPO_ROOT" branch --show-current)
+    [[ "$branch" == "main" ]] || die "releases are built from main (on '$branch')"
+    [[ -z "$(git -C "$REPO_ROOT" status --porcelain)" ]] ||
+        die "working tree has uncommitted or untracked files"
+    git -C "$REPO_ROOT" fetch --quiet origin main
+    [[ "$(git -C "$REPO_ROOT" rev-parse HEAD)" == "$(git -C "$REPO_ROOT" rev-parse origin/main)" ]] ||
+        die "main is not in sync with origin/main; pull or push first"
+}
+
+# The build number Sparkle and App Store Connect compare; scripts/bump.sh keeps it a positive integer.
+read_build_number() {
+    local value
+    value=$(read_setting CURRENT_PROJECT_VERSION)
+    [[ "$value" =~ ^[1-9][0-9]*$ ]] || die "CURRENT_PROJECT_VERSION must be a positive integer, got '$value'"
+    echo "$value"
+}
+
 plist_value() {
     /usr/libexec/PlistBuddy -c "Print :$2" "$1"
 }
@@ -50,6 +71,7 @@ archive_app() {
         -destination "generic/platform=macOS" \
         -archivePath "$3" \
         -derivedDataPath "$DERIVED_DATA" \
+        -onlyUsePackageVersionsFromResolvedFile \
         -allowProvisioningUpdates
 }
 

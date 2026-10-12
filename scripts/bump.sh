@@ -17,7 +17,7 @@ for arg in "$@"; do
         --no-commit) commit=0 ;;
         -h|--help) sed -n '2,9p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
         -*) die "unknown option $arg" ;;
-        *) new_version="$arg" ;;
+        *) [[ -z "$new_version" ]] || die "give at most one version"; new_version="$arg" ;;
     esac
 done
 

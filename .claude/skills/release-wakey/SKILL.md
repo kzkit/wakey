@@ -69,7 +69,10 @@ The version lives only in `Config/Version.xcconfig` (`MARKETING_VERSION`, `CURRE
 - **Build numbers only go up.** Sparkle compares `sparkle:version` (`CFBundleVersion`), and App Store Connect rejects reused builds. The direct script refuses to run if the build isn't above the live appcast's.
 - **Don't edit Version/Build in Xcode's General tab.** It writes a target-level override into `project.pbxproj` that shadows the xcconfig. `grep -c 'MARKETING_VERSION\|CURRENT_PROJECT_VERSION' Wakey.xcodeproj/project.pbxproj` should print `0`. If it doesn't, delete those lines.
 - **The appcast must never point at an asset that isn't live.** The script downloads the release zip and checks its size before pushing `appcast.xml`.
-- **If publishing fails halfway** (release created but appcast push failed), `--publish-only` refuses because the release exists. Finish by hand from the main checkout: `cp release/<version>/appcast.xml appcast.xml && git commit -m "chore: release v<version>" -- appcast.xml && git push origin main`.
+- **If publishing fails halfway**, the GitHub release exists, so `--publish-only` refuses. Finish by hand from the main checkout:
+  - *The served-size check failed* ("appcast NOT pushed"): once `curl -sL <download url> | wc -c` matches the zip's size, run `cp release/<version>/appcast.xml appcast.xml && git commit -m "chore: release v<version>" -- appcast.xml && git push origin main`.
+  - *The push failed* (the local `chore: release` commit exists): `git pull --rebase origin main && git push origin main`.
+- **`--publish-only` only publishes a build of the current commit.** `release/<version>/build-info` records the commit, build number and a clean-tree flag. Publishing refuses if main has moved, the build number changed, or the build came from a dirty tree; rebuild in those cases.
 - **Notarization rejected:** read `release/<version>/notary-log.json`. The usual causes are a missing hardened runtime or an unsigned nested binary in Sparkle.framework.
 - `release/` and `build/` are gitignored. Never commit their contents. The root `appcast.xml` is the only release artifact in git.
 - `appcast.xml` holds only the latest item, so the script regenerates the whole file each release.

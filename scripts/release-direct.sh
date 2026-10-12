@@ -38,7 +38,7 @@ done
 ((build || publish)) || die "--no-publish and --publish-only together do nothing"
 
 version=$(read_setting MARKETING_VERSION)
-build_number=$(read_setting CURRENT_PROJECT_VERSION)
+build_number=$(read_build_number)
 tag="v$version"
 out="$REPO_ROOT/release/$version"
 app="$out/export/Wakey.app"
@@ -57,14 +57,7 @@ check_can_publish() {
     command -v gh >/dev/null || die "gh is not installed"
     gh auth status >/dev/null 2>&1 || die "gh is not signed in; run: gh auth login"
 
-    local branch
-    branch=$(git -C "$REPO_ROOT" branch --show-current)
-    [[ "$branch" == "main" ]] || die "publishing pushes appcast.xml to main, so run this from main (on '$branch')"
-    [[ -z "$(git -C "$REPO_ROOT" status --porcelain --untracked-files=no)" ]] ||
-        die "working tree has uncommitted changes"
-    git -C "$REPO_ROOT" fetch --quiet origin main
-    [[ "$(git -C "$REPO_ROOT" rev-parse HEAD)" == "$(git -C "$REPO_ROOT" rev-parse origin/main)" ]] ||
-        die "main is not in sync with origin/main; pull or push first"
+    check_clean_main
 
     if gh release view "$tag" --repo "$GITHUB_REPO" >/dev/null 2>&1; then
         die "GitHub release $tag already exists; bump the version with scripts/bump.sh"
@@ -129,8 +122,9 @@ EOF
 
     step "Notarizing (usually a few minutes)"
     ditto -c -k --sequesterRsrc --keepParent "$app" "$out/notarize.zip"
+    # A rejection is handled below with its log, so don't let notarytool's exit status end the script first.
     xcrun notarytool submit "$out/notarize.zip" --keychain-profile "$NOTARY_PROFILE" \
-        --wait --output-format json >"$out/notary.json"
+        --wait --output-format json >"$out/notary.json" || true
     local status submission
     status=$(plutil -extract status raw -o - "$out/notary.json")
     submission=$(plutil -extract id raw -o - "$out/notary.json")
@@ -152,9 +146,12 @@ EOF
     signature=$("$(sparkle_tool sign_update)" -p "$zip")
     length=$(stat -f %z "$zip")
     [[ -n "$signature" ]] || die "sign_update returned no signature"
+    "$(sparkle_tool sign_update)" --verify "$zip" "$signature" >/dev/null 2>&1 ||
+        die "the zip's Sparkle signature doesn't verify"
     min_os=$(plist_value "$app/Contents/Info.plist" LSMinimumSystemVersion)
     pub_date=$(LC_ALL=C date "+%a, %d %b %Y %H:%M:%S %z")
-    cat >"$out/appcast.xml" <<EOF
+    # Written aside and moved into place only once valid, so --publish-only never finds a bad appcast.
+    cat >"$out/appcast.xml.tmp" <<EOF
 <?xml version="1.0" standalone="yes"?>
 <rss xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" version="2.0">
     <channel>
@@ -170,8 +167,13 @@ EOF
     </channel>
 </rss>
 EOF
-    xmllint --noout "$out/appcast.xml" ||
+    xmllint --noout "$out/appcast.xml.tmp" ||
         die "generated appcast.xml is not valid XML"
+    mv "$out/appcast.xml.tmp" "$out/appcast.xml"
+    # Lets --publish-only check it's publishing a build of the commit being released.
+    printf 'commit=%s\nbuild=%s\nclean=%s\n' \
+        "$(git -C "$REPO_ROOT" rev-parse HEAD)" "$build_number" \
+        "$([[ -z "$(git -C "$REPO_ROOT" status --porcelain)" ]] && echo 1 || echo 0)" >"$out/build-info"
     ok "$zip_name ($length bytes), appcast.xml written"
 }
 
@@ -188,10 +190,32 @@ write_default_notes() {
     } >"$out/notes.md"
 }
 
-publish_release() {
-    for file in "$zip" "$out/appcast.xml"; do
+# The staged artifacts must be a build of exactly what's being tagged: built from this commit, at this build
+# number, from a clean tree, and still notarized.
+check_artifacts_match_head() {
+    local file
+    for file in "$zip" "$out/appcast.xml" "$out/build-info"; do
         [[ -f "$file" ]] || die "$file is missing; run without --publish-only first"
     done
+
+    local built_commit built_build built_clean staged_build head
+    built_commit=$(sed -n 's/^commit=//p' "$out/build-info")
+    built_build=$(sed -n 's/^build=//p' "$out/build-info")
+    built_clean=$(sed -n 's/^clean=//p' "$out/build-info")
+    staged_build=$(sed -nE '/<sparkle:version>/{s|.*<sparkle:version>(.+)</sparkle:version>.*|\1|p;q;}' "$out/appcast.xml")
+    head=$(git -C "$REPO_ROOT" rev-parse HEAD)
+
+    [[ "$built_commit" == "$head" ]] ||
+        die "release/$version was built from ${built_commit:0:7}, but main is at ${head:0:7}; rebuild without --publish-only"
+    [[ "$built_clean" == 1 ]] ||
+        die "release/$version was built with uncommitted or untracked files; rebuild without --publish-only"
+    [[ "$built_build" == "$build_number" && "$staged_build" == "$build_number" ]] ||
+        die "release/$version holds build $staged_build, but Version.xcconfig says $build_number; rebuild without --publish-only"
+    xcrun stapler validate -q "$app" || die "$app is no longer stapled; rebuild without --publish-only"
+}
+
+publish_release() {
+    check_artifacts_match_head
     if [[ -n "$notes_file" ]]; then
         cp "$notes_file" "$out/notes.md"
     elif [[ ! -f "$out/notes.md" ]]; then

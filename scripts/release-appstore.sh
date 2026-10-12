@@ -24,7 +24,7 @@ for arg in "$@"; do
 done
 
 version=$(read_setting MARKETING_VERSION)
-build_number=$(read_setting CURRENT_PROJECT_VERSION)
+build_number=$(read_build_number)
 out="$REPO_ROOT/release/$version/appstore"
 
 auth_args=()
@@ -56,6 +56,11 @@ EOF
         -exportPath "$out/export" \
         -allowProvisioningUpdates ${auth_args[@]+"${auth_args[@]}"}
 }
+
+# An upload uses up its build number, so only upload what's on origin/main.
+if ((upload)); then
+    check_clean_main
+fi
 
 rm -rf "$out"
 mkdir -p "$out"
