@@ -89,6 +89,12 @@ build_release() {
     mkdir -p "$out"
     find "$out" -mindepth 1 -maxdepth 1 ! -name notes.md ! -name appstore -exec rm -rf {} +
 
+    # The source as the archive sees it. Checked again at the end, so a checkout that changes during the
+    # build (a branch switch or pull while notarizing) can't be recorded as this build's source.
+    local source_commit source_clean
+    source_commit=$(git -C "$REPO_ROOT" rev-parse HEAD)
+    source_clean=$(tree_clean_flag)
+
     step "Archiving Wakey Direct $version ($build_number)"
     archive_app "Wakey Direct" "Release-Direct" "$out/Wakey.xcarchive" "$out/archive.log"
     check_archive_version "$out/Wakey.xcarchive" "$version" "$build_number"
@@ -123,11 +129,13 @@ EOF
     step "Notarizing (usually a few minutes)"
     ditto -c -k --sequesterRsrc --keepParent "$app" "$out/notarize.zip"
     # A rejection is handled below with its log, so don't let notarytool's exit status end the script first.
+    local submit_status=0
     xcrun notarytool submit "$out/notarize.zip" --keychain-profile "$NOTARY_PROFILE" \
-        --wait --output-format json >"$out/notary.json" || true
+        --wait --output-format json >"$out/notary.json" || submit_status=$?
     local status submission
-    status=$(plutil -extract status raw -o - "$out/notary.json")
-    submission=$(plutil -extract id raw -o - "$out/notary.json")
+    status=$(plutil -extract status raw -o - "$out/notary.json" 2>/dev/null) &&
+        submission=$(plutil -extract id raw -o - "$out/notary.json" 2>/dev/null) ||
+        die "notarytool submit failed (exit $submit_status): $(cat "$out/notary.json")"
     if [[ "$status" != "Accepted" ]]; then
         xcrun notarytool log "$submission" --keychain-profile "$NOTARY_PROFILE" "$out/notary-log.json" || true
         die "notarization $status (submission $submission), details: $out/notary-log.json"
@@ -170,10 +178,15 @@ EOF
     xmllint --noout "$out/appcast.xml.tmp" ||
         die "generated appcast.xml is not valid XML"
     mv "$out/appcast.xml.tmp" "$out/appcast.xml"
+
+    local end_commit end_clean
+    end_commit=$(git -C "$REPO_ROOT" rev-parse HEAD)
+    end_clean=$(tree_clean_flag)
+    [[ "$end_commit" == "$source_commit" ]] ||
+        die "HEAD moved from ${source_commit:0:7} to ${end_commit:0:7} during the build; rebuild"
+    [[ "$end_clean" == 1 ]] || source_clean=0
     # Lets --publish-only check it's publishing a build of the commit being released.
-    printf 'commit=%s\nbuild=%s\nclean=%s\n' \
-        "$(git -C "$REPO_ROOT" rev-parse HEAD)" "$build_number" \
-        "$([[ -z "$(git -C "$REPO_ROOT" status --porcelain)" ]] && echo 1 || echo 0)" >"$out/build-info"
+    printf 'commit=%s\nbuild=%s\nclean=%s\n' "$source_commit" "$build_number" "$source_clean" >"$out/build-info"
     ok "$zip_name ($length bytes), appcast.xml written"
 }
 
@@ -198,11 +211,12 @@ check_artifacts_match_head() {
         [[ -f "$file" ]] || die "$file is missing; run without --publish-only first"
     done
 
-    local built_commit built_build built_clean staged_build head
+    local built_commit built_build built_clean staged_build staged_length head
     built_commit=$(sed -n 's/^commit=//p' "$out/build-info")
     built_build=$(sed -n 's/^build=//p' "$out/build-info")
     built_clean=$(sed -n 's/^clean=//p' "$out/build-info")
     staged_build=$(sed -nE '/<sparkle:version>/{s|.*<sparkle:version>(.+)</sparkle:version>.*|\1|p;q;}' "$out/appcast.xml")
+    staged_length=$(sed -nE 's|.*<enclosure .*length="([0-9]+)".*|\1|p' "$out/appcast.xml")
     head=$(git -C "$REPO_ROOT" rev-parse HEAD)
 
     [[ "$built_commit" == "$head" ]] ||
@@ -210,8 +224,11 @@ check_artifacts_match_head() {
     [[ "$built_clean" == 1 ]] ||
         die "release/$version was built with uncommitted or untracked files; rebuild without --publish-only"
     [[ "$built_build" == "$build_number" && "$staged_build" == "$build_number" ]] ||
-        die "release/$version holds build $staged_build, but Version.xcconfig says $build_number; rebuild without --publish-only"
+        die "release/$version was built as build $built_build with an appcast for build $staged_build, but Version.xcconfig says $build_number; rebuild without --publish-only"
+    [[ "$staged_length" == "$(stat -f %z "$zip")" ]] ||
+        die "$zip_name doesn't match the length in release/$version/appcast.xml; rebuild without --publish-only"
     xcrun stapler validate -q "$app" || die "$app is no longer stapled; rebuild without --publish-only"
+    verified_commit="$head"
 }
 
 publish_release() {
@@ -234,8 +251,11 @@ publish_release() {
         exit 0
     fi
 
+    [[ "$(git -C "$REPO_ROOT" rev-parse HEAD)" == "$verified_commit" ]] ||
+        die "HEAD changed while waiting to publish; nothing was published"
+    # Tag the commit the artifacts were checked against.
     gh release create "$tag" "$zip" --repo "$GITHUB_REPO" \
-        --target "$(git -C "$REPO_ROOT" rev-parse HEAD)" \
+        --target "$verified_commit" \
         --title "$tag" --notes-file "$out/notes.md"
     ok "GitHub release $tag created"
 

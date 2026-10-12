@@ -28,14 +28,23 @@ read_setting() {
     echo "$value"
 }
 
+# Prints 1 when the working tree has no uncommitted or untracked files, else 0. Dies if git can't tell,
+# rather than treating its empty output as clean.
+tree_clean_flag() {
+    local status
+    status=$(git -C "$REPO_ROOT" status --porcelain) || die "git status failed in $REPO_ROOT"
+    if [[ -z "$status" ]]; then echo 1; else echo 0; fi
+}
+
 # Releases ship what's on origin/main: on main, nothing uncommitted or untracked (files in Wakey/ are
 # compiled in automatically), and in sync with origin.
 check_clean_main() {
     local branch
     branch=$(git -C "$REPO_ROOT" branch --show-current)
     [[ "$branch" == "main" ]] || die "releases are built from main (on '$branch')"
-    [[ -z "$(git -C "$REPO_ROOT" status --porcelain)" ]] ||
-        die "working tree has uncommitted or untracked files"
+    local clean
+    clean=$(tree_clean_flag)
+    [[ "$clean" == 1 ]] || die "working tree has uncommitted or untracked files"
     git -C "$REPO_ROOT" fetch --quiet origin main
     [[ "$(git -C "$REPO_ROOT" rev-parse HEAD)" == "$(git -C "$REPO_ROOT" rev-parse origin/main)" ]] ||
         die "main is not in sync with origin/main; pull or push first"
