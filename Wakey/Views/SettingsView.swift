@@ -295,7 +295,6 @@ struct SettingsView: View {
 				Text("to")
 					.font(.callout)
 					.foregroundStyle(.secondary)
-					// The time fields otherwise squeeze this label to nothing.
 					.fixedSize()
 				
 				timeField(minute: schedule.endMinute, accessibilityLabel: L10n.string("End time")) { minute in
@@ -683,8 +682,8 @@ private struct TimeOfDayField: NSViewRepresentable {
 		Coordinator(onChange: onChange)
 	}
 	
-	func makeNSView(context: Context) -> NSDatePicker {
-		let picker = NSDatePicker()
+	func makeNSView(context: Context) -> TimeOfDayPicker {
+		let picker = TimeOfDayPicker()
 		picker.datePickerStyle = .textField
 		picker.datePickerElements = .hourMinute
 		picker.isBezeled = false
@@ -694,12 +693,19 @@ private struct TimeOfDayField: NSViewRepresentable {
 		picker.font = .monospacedDigitSystemFont(ofSize: NSFont.systemFontSize, weight: .regular)
 		picker.target = context.coordinator
 		picker.action = #selector(Coordinator.dateChanged(_:))
+		picker.onResignFirstResponder = { [weak coordinator = context.coordinator, weak picker] in
+			guard let picker else { return }
+			coordinator?.commitPendingChange(from: picker)
+		}
 		return picker
 	}
 	
-	func updateNSView(_ picker: NSDatePicker, context: Context) {
+	func updateNSView(_ picker: TimeOfDayPicker, context: Context) {
 		context.coordinator.onChange = onChange
 		picker.setAccessibilityLabel(accessibilityLabel)
+		
+		// Don't overwrite a time that's still being typed with the saved one.
+		guard !context.coordinator.hasPendingChange else { return }
 		
 		let date = Schedule.timeOfDayDate(forMinute: minute)
 		if picker.dateValue != date {
@@ -707,16 +713,61 @@ private struct TimeOfDayField: NSViewRepresentable {
 		}
 	}
 	
+	static func dismantleNSView(_ picker: TimeOfDayPicker, coordinator: Coordinator) {
+		coordinator.commitPendingChange(from: picker)
+	}
+	
 	final class Coordinator: NSObject {
+		/// Long enough to type both digits of an hour or minute, so a half-typed time is never saved.
+		private static let commitDelay: TimeInterval = 0.8
+		
 		var onChange: (Int) -> Void
+		private var pendingChange: DispatchWorkItem?
+		
+		var hasPendingChange: Bool {
+			pendingChange != nil
+		}
 		
 		init(onChange: @escaping (Int) -> Void) {
 			self.onChange = onChange
 		}
 		
+		/// The picker reports every keystroke. Save once typing pauses, or as soon as the field loses focus.
 		@objc func dateChanged(_ picker: NSDatePicker) {
+			pendingChange?.cancel()
+			let change = DispatchWorkItem { [weak self, weak picker] in
+				guard let self, let picker else { return }
+				self.commitPendingChange(from: picker)
+			}
+			pendingChange = change
+			DispatchQueue.main.asyncAfter(deadline: .now() + Self.commitDelay, execute: change)
+		}
+		
+		func commitPendingChange(from picker: NSDatePicker) {
+			guard let pendingChange else { return }
+			
+			pendingChange.cancel()
+			self.pendingChange = nil
 			onChange(Schedule.minute(ofTimeOfDay: picker.dateValue))
 		}
+	}
+}
+
+private final class TimeOfDayPicker: NSDatePicker {
+	var onResignFirstResponder: (() -> Void)?
+	
+	/// Only reachable with Tab when Full Keyboard Access is on, like the switches around it. Otherwise AppKit would pick
+	/// it as the first field when Settings opens and a stray keypress would change the schedule.
+	override var canBecomeKeyView: Bool {
+		NSApp.isFullKeyboardAccessEnabled && super.canBecomeKeyView
+	}
+	
+	override func resignFirstResponder() -> Bool {
+		let didResign = super.resignFirstResponder()
+		if didResign {
+			onResignFirstResponder?()
+		}
+		return didResign
 	}
 }
 
