@@ -288,18 +288,18 @@ struct SettingsView: View {
 			Spacer(minLength: 0)
 			
 			HStack(spacing: 8) {
-				timeMenu(selectedMinute: schedule.startMinute) { selectedMinute in
-					updateSchedule(startMinute: selectedMinute)
+				timeField(minute: schedule.startMinute, accessibilityLabel: L10n.string("Start time")) { minute in
+					updateSchedule(startMinute: minute)
 				}
 				
 				Text("to")
 					.font(.callout)
 					.foregroundStyle(.secondary)
-					// The system menu buttons on macOS 26+ otherwise squeeze this label to nothing.
+					// The time fields otherwise squeeze this label to nothing.
 					.fixedSize()
 				
-				timeMenu(selectedMinute: schedule.endMinute) { selectedMinute in
-					updateSchedule(endMinute: selectedMinute)
+				timeField(minute: schedule.endMinute, accessibilityLabel: L10n.string("End time")) { minute in
+					updateSchedule(endMinute: minute)
 				}
 			}
 		}
@@ -521,18 +521,15 @@ struct SettingsView: View {
 		refreshListedApps()
 	}
 	
-	private func timeMenu(selectedMinute: Int, onSelect: @escaping (Int) -> Void) -> some View {
-		ValueMenu(title: timeLabel(selectedMinute)) {
-			ForEach(Schedule.selectableMinutes, id: \.self) { minute in
-				Button(timeLabel(minute)) {
-					onSelect(minute)
-				}
-			}
-		}
-	}
-	
-	private func timeLabel(_ minute: Int) -> String {
-		String(format: "%02d:%02d", minute / 60, minute % 60)
+	private func timeField(minute: Int, accessibilityLabel: String, onChange: @escaping (Int) -> Void) -> some View {
+		TimeOfDayField(minute: minute, accessibilityLabel: accessibilityLabel, onChange: onChange)
+			.fixedSize()
+			.padding(.horizontal, 8)
+			.padding(.vertical, 4)
+			.background(
+				RoundedRectangle(cornerRadius: 7, style: .continuous)
+					.fill(SystemFill.secondary.color(fallbackOpacity: 0.06))
+			)
 	}
 	
 	private var categorizedApps: (watched: [InstalledApp], available: [InstalledApp], isEmpty: Bool) {
@@ -672,6 +669,54 @@ private struct SettingsGroup<Content: View>: View {
 			content
 		}
 		.groupBackground(cornerRadius: 14, fallbackOpacity: 0.045)
+	}
+}
+
+/// A time typed in place: click the hour or minute and type, or step it with the arrow keys. It's the system time
+/// field, following the 12/24-hour setting, drawn without its bezel and background so it sits on the settings pill.
+private struct TimeOfDayField: NSViewRepresentable {
+	let minute: Int
+	let accessibilityLabel: String
+	let onChange: (Int) -> Void
+	
+	func makeCoordinator() -> Coordinator {
+		Coordinator(onChange: onChange)
+	}
+	
+	func makeNSView(context: Context) -> NSDatePicker {
+		let picker = NSDatePicker()
+		picker.datePickerStyle = .textField
+		picker.datePickerElements = .hourMinute
+		picker.isBezeled = false
+		picker.isBordered = false
+		picker.drawsBackground = false
+		picker.timeZone = Schedule.timeOfDayTimeZone
+		picker.font = .monospacedDigitSystemFont(ofSize: NSFont.systemFontSize, weight: .regular)
+		picker.target = context.coordinator
+		picker.action = #selector(Coordinator.dateChanged(_:))
+		return picker
+	}
+	
+	func updateNSView(_ picker: NSDatePicker, context: Context) {
+		context.coordinator.onChange = onChange
+		picker.setAccessibilityLabel(accessibilityLabel)
+		
+		let date = Schedule.timeOfDayDate(forMinute: minute)
+		if picker.dateValue != date {
+			picker.dateValue = date
+		}
+	}
+	
+	final class Coordinator: NSObject {
+		var onChange: (Int) -> Void
+		
+		init(onChange: @escaping (Int) -> Void) {
+			self.onChange = onChange
+		}
+		
+		@objc func dateChanged(_ picker: NSDatePicker) {
+			onChange(Schedule.minute(ofTimeOfDay: picker.dateValue))
+		}
 	}
 }
 
