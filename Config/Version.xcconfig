@@ -3,5 +3,5 @@
 // overrides these. Change them with scripts/bump.sh rather than in Xcode's General tab,
 // which would write a target-level override back into project.pbxproj.
 
-MARKETING_VERSION = 1.0.3
-CURRENT_PROJECT_VERSION = 4
+MARKETING_VERSION = 1.1.0
+CURRENT_PROJECT_VERSION = 5
