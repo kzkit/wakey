@@ -721,7 +721,8 @@ private struct TimeOfDayField: NSViewRepresentable {
 	}
 	
 	final class Coordinator: NSObject {
-		/// The picker reports the hour and the minute separately, so an hour and minute typed in a row are saved once.
+		/// Long enough to finish typing an hour or minute and move to the next, so half-typed and intermediate times
+		/// are never saved.
 		private static let commitDelay: TimeInterval = 0.8
 		
 		var onChange: (Int) -> Void
