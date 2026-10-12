@@ -288,18 +288,17 @@ struct SettingsView: View {
 			Spacer(minLength: 0)
 			
 			HStack(spacing: 8) {
-				timeMenu(selectedMinute: schedule.startMinute) { selectedMinute in
-					updateSchedule(startMinute: selectedMinute)
+				timeField(minute: schedule.startMinute, accessibilityLabel: L10n.string("Start time")) { minute in
+					updateSchedule(startMinute: minute)
 				}
 				
 				Text("to")
 					.font(.callout)
 					.foregroundStyle(.secondary)
-					// The system menu buttons on macOS 26+ otherwise squeeze this label to nothing.
 					.fixedSize()
 				
-				timeMenu(selectedMinute: schedule.endMinute) { selectedMinute in
-					updateSchedule(endMinute: selectedMinute)
+				timeField(minute: schedule.endMinute, accessibilityLabel: L10n.string("End time")) { minute in
+					updateSchedule(endMinute: minute)
 				}
 			}
 		}
@@ -521,18 +520,15 @@ struct SettingsView: View {
 		refreshListedApps()
 	}
 	
-	private func timeMenu(selectedMinute: Int, onSelect: @escaping (Int) -> Void) -> some View {
-		ValueMenu(title: timeLabel(selectedMinute)) {
-			ForEach(Schedule.selectableMinutes, id: \.self) { minute in
-				Button(timeLabel(minute)) {
-					onSelect(minute)
-				}
-			}
-		}
-	}
-	
-	private func timeLabel(_ minute: Int) -> String {
-		String(format: "%02d:%02d", minute / 60, minute % 60)
+	private func timeField(minute: Int, accessibilityLabel: String, onChange: @escaping (Int) -> Void) -> some View {
+		TimeOfDayField(minute: minute, accessibilityLabel: accessibilityLabel, onChange: onChange)
+			.fixedSize()
+			.padding(.horizontal, 8)
+			.padding(.vertical, 4)
+			.background(
+				RoundedRectangle(cornerRadius: 7, style: .continuous)
+					.fill(SystemFill.secondary.color(fallbackOpacity: 0.06))
+			)
 	}
 	
 	private var categorizedApps: (watched: [InstalledApp], available: [InstalledApp], isEmpty: Bool) {
@@ -672,6 +668,180 @@ private struct SettingsGroup<Content: View>: View {
 			content
 		}
 		.groupBackground(cornerRadius: 14, fallbackOpacity: 0.045)
+	}
+}
+
+/// A time typed in place: click the hour or minute and type, or step it with the arrow keys. It's the system time
+/// field, following the 12/24-hour setting, drawn without its bezel and background so it sits on the settings pill.
+private struct TimeOfDayField: NSViewRepresentable {
+	let minute: Int
+	let accessibilityLabel: String
+	let onChange: (Int) -> Void
+	
+	func makeCoordinator() -> Coordinator {
+		Coordinator(onChange: onChange)
+	}
+	
+	func makeNSView(context: Context) -> TimeOfDayPicker {
+		let picker = TimeOfDayPicker()
+		picker.datePickerStyle = .textField
+		picker.datePickerElements = .hourMinute
+		picker.isBezeled = false
+		picker.isBordered = false
+		picker.drawsBackground = false
+		picker.timeZone = Schedule.timeOfDayTimeZone
+		picker.font = .monospacedDigitSystemFont(ofSize: NSFont.systemFontSize, weight: .regular)
+		picker.target = context.coordinator
+		picker.action = #selector(Coordinator.dateChanged(_:))
+		picker.onResignFirstResponder = { [weak coordinator = context.coordinator, weak picker] in
+			guard let picker else { return }
+			coordinator?.commitPendingChange(from: picker)
+		}
+		return picker
+	}
+	
+	func updateNSView(_ picker: TimeOfDayPicker, context: Context) {
+		context.coordinator.onChange = onChange
+		picker.setAccessibilityLabel(accessibilityLabel)
+		
+		// Don't overwrite a time that's still being typed with the saved one.
+		guard !context.coordinator.hasPendingChange else { return }
+		
+		let date = Schedule.timeOfDayDate(forMinute: minute)
+		if picker.dateValue != date {
+			picker.dateValue = date
+		}
+	}
+	
+	static func dismantleNSView(_ picker: TimeOfDayPicker, coordinator: Coordinator) {
+		// Teardown happens during a view update, which mustn't change state, so save on the next turn.
+		DispatchQueue.main.async {
+			coordinator.commitPendingChange(from: picker)
+		}
+	}
+	
+	final class Coordinator: NSObject {
+		/// Long enough to finish typing an hour or minute and move to the next, so half-typed and intermediate times
+		/// are never saved.
+		private static let commitDelay: TimeInterval = 0.8
+		
+		var onChange: (Int) -> Void
+		private var pendingChange: DispatchWorkItem?
+		
+		var hasPendingChange: Bool {
+			pendingChange != nil
+		}
+		
+		init(onChange: @escaping (Int) -> Void) {
+			self.onChange = onChange
+		}
+		
+		/// The picker reports every keystroke. Save once typing pauses, or as soon as the field loses focus.
+		@objc func dateChanged(_ picker: NSDatePicker) {
+			pendingChange?.cancel()
+			let change = DispatchWorkItem { [weak self, weak picker] in
+				guard let self, let picker else { return }
+				self.commitPendingChange(from: picker)
+			}
+			pendingChange = change
+			DispatchQueue.main.asyncAfter(deadline: .now() + Self.commitDelay, execute: change)
+		}
+		
+		func commitPendingChange(from picker: NSDatePicker) {
+			guard let pendingChange else { return }
+			
+			pendingChange.cancel()
+			self.pendingChange = nil
+			onChange(Schedule.minute(ofTimeOfDay: picker.dateValue))
+		}
+	}
+}
+
+private final class TimeOfDayPicker: NSDatePicker {
+	var onResignFirstResponder: (() -> Void)?
+	private var outsideClickMonitor: Any?
+	private var windowCloseObserver: NSObjectProtocol?
+	
+	/// Only reachable with Tab when Full Keyboard Access is on, like the switches around it. Otherwise AppKit would pick
+	/// it as the first field when Settings opens and a stray keypress would change the schedule.
+	override var canBecomeKeyView: Bool {
+		NSApp.isFullKeyboardAccessEnabled && super.canBecomeKeyView
+	}
+	
+	override func becomeFirstResponder() -> Bool {
+		let didBecome = super.becomeFirstResponder()
+		if didBecome {
+			startEndingEditingOnOutsideClicks()
+		}
+		return didBecome
+	}
+	
+	override func resignFirstResponder() -> Bool {
+		let didResign = super.resignFirstResponder()
+		if didResign {
+			stopEndingEditingOnOutsideClicks()
+			onResignFirstResponder?()
+		}
+		return didResign
+	}
+	
+	override func viewWillMove(toWindow newWindow: NSWindow?) {
+		super.viewWillMove(toWindow: newWindow)
+		if newWindow == nil {
+			stopEndingEditingOnOutsideClicks()
+		}
+	}
+	
+	/// Closing a window doesn't take focus from its field, so a reopened Settings window would come back with the time
+	/// still being edited. End editing (and save) as the window closes instead.
+	override func viewDidMoveToWindow() {
+		super.viewDidMoveToWindow()
+		
+		if let windowCloseObserver {
+			NotificationCenter.default.removeObserver(windowCloseObserver)
+			self.windowCloseObserver = nil
+		}
+		guard let window else { return }
+		
+		windowCloseObserver = NotificationCenter.default.addObserver(
+			forName: NSWindow.willCloseNotification,
+			object: window,
+			queue: .main
+		) { [weak self] _ in
+			guard let self, let window = self.window, window.firstResponder === self else { return }
+			window.makeFirstResponder(nil)
+		}
+	}
+	
+	/// Return finishes editing, like it does in a text field.
+	override func keyDown(with event: NSEvent) {
+		if event.keyCode == 36 || event.keyCode == 76 {
+			window?.makeFirstResponder(nil)
+		} else {
+			super.keyDown(with: event)
+		}
+	}
+	
+	/// Clicking elsewhere in a window doesn't take focus from a field by itself, so the hour or minute would stay
+	/// highlighted. While editing, any click outside the field ends editing; the click itself still goes through.
+	private func startEndingEditingOnOutsideClicks() {
+		guard outsideClickMonitor == nil else { return }
+		
+		outsideClickMonitor = NSEvent.addLocalMonitorForEvents(matching: .leftMouseDown) { [weak self] event in
+			guard let self, let window, event.window === window else { return event }
+			
+			if !bounds.contains(convert(event.locationInWindow, from: nil)) {
+				window.makeFirstResponder(nil)
+			}
+			return event
+		}
+	}
+	
+	private func stopEndingEditingOnOutsideClicks() {
+		if let outsideClickMonitor {
+			NSEvent.removeMonitor(outsideClickMonitor)
+			self.outsideClickMonitor = nil
+		}
 	}
 }
 

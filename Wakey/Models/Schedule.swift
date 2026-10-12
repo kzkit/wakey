@@ -9,7 +9,6 @@ import Foundation
 
 struct Schedule: Equatable {
 	static let minutesPerDay = 24 * 60
-	static let minuteStep = 30
 	/// `Calendar` weekday numbers: 1 = Sunday … 7 = Saturday.
 	static let allWeekdays: Set<Int> = Set(1...7)
 	static let workWeekdays: Set<Int> = Set(2...6)
@@ -36,9 +35,21 @@ struct Schedule: Equatable {
 		self.init(isEnabled: isEnabled, startMinute: startHour * 60, endMinute: endHour * 60, weekdays: weekdays)
 	}
 	
-	/// Every selectable start/end time, in minutes since midnight.
-	static var selectableMinutes: [Int] {
-		Array(stride(from: 0, to: minutesPerDay, by: minuteStep))
+	/// The time zone time-of-day pickers work in. UTC has no daylight-saving gaps, so every minute of the day
+	/// round-trips through `timeOfDayDate(forMinute:)` and `minute(ofTimeOfDay:)`.
+	static let timeOfDayTimeZone = TimeZone(identifier: "UTC")!
+	
+	/// A date whose time of day, in `timeOfDayTimeZone`, is `minute` minutes past midnight.
+	static func timeOfDayDate(forMinute minute: Int) -> Date {
+		Date(timeIntervalSinceReferenceDate: TimeInterval(minute * 60))
+	}
+	
+	/// Minutes since midnight of `date`'s time of day in `timeOfDayTimeZone`.
+	static func minute(ofTimeOfDay date: Date) -> Int {
+		var calendar = Calendar(identifier: .gregorian)
+		calendar.timeZone = timeOfDayTimeZone
+		let components = calendar.dateComponents([.hour, .minute], from: date)
+		return (components.hour ?? 0) * 60 + (components.minute ?? 0)
 	}
 	
 	/// Weekday numbers in display order, starting from the calendar's first weekday.

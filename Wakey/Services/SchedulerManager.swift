@@ -70,7 +70,7 @@ final class SchedulerManager: ObservableObject {
 	}
 	
 	private func startAlignedTimer() {
-		// Align the 60 s check to the start of each minute so half-hour boundaries are picked up within about a second.
+		// Align the 60 s check to the start of each minute so a schedule starts or ends within about a second of its minute.
 		timerCancellable = Just(())
 			.delay(for: .seconds(Self.delayUntilNextMinute(from: dateProvider())), scheduler: DispatchQueue.main)
 			.flatMap { _ in

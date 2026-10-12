@@ -132,13 +132,23 @@ final class ScheduleTests: XCTestCase {
 		}
 	}
 	
-	func testSelectableMinutesAreEveryHalfHour() {
-		let minutes = Schedule.selectableMinutes
+	func testTimeOfDayRoundTripsEveryMinute() {
+		for minute in 0..<Schedule.minutesPerDay {
+			XCTAssertEqual(Schedule.minute(ofTimeOfDay: Schedule.timeOfDayDate(forMinute: minute)), minute)
+		}
+	}
+	
+	func testMinuteOfTimeOfDayIgnoresTheDay() {
+		let nextDay = Schedule.timeOfDayDate(forMinute: 9 * 60 + 15).addingTimeInterval(24 * 60 * 60)
 		
-		XCTAssertEqual(minutes.count, 48)
-		XCTAssertEqual(minutes.first, 0)
-		XCTAssertEqual(minutes[1], 30)
-		XCTAssertEqual(minutes.last, 23 * 60 + 30)
+		XCTAssertEqual(Schedule.minute(ofTimeOfDay: nextDay), 9 * 60 + 15)
+	}
+	
+	func testMinuteOfTimeOfDayWrapsBeforeMidnight() {
+		// Stepping down from 00:00 in the picker lands on the previous day.
+		let previousDay = Schedule.timeOfDayDate(forMinute: 0).addingTimeInterval(-60)
+		
+		XCTAssertEqual(Schedule.minute(ofTimeOfDay: previousDay), 23 * 60 + 59)
 	}
 	
 	func testOrderedWeekdaysStartsFromFirstWeekday() {
