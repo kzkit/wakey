@@ -251,6 +251,9 @@ publish_release() {
         exit 0
     fi
 
+    # Main may have moved while the prompt waited (locally or on origin), which would leave the appcast push
+    # rejected after the release is already public.
+    check_clean_main
     [[ "$(git -C "$REPO_ROOT" rev-parse HEAD)" == "$verified_commit" ]] ||
         die "HEAD changed while waiting to publish; nothing was published"
     # Tag the commit the artifacts were checked against.
