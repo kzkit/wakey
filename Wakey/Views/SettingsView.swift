@@ -38,7 +38,7 @@ struct SettingsView: View {
 			}
 		}
 		.frame(width: 460, height: 560)
-		.windowContentBackground()
+		.menuPanelWindowBackground()
 		.background(SettingsWindowAccessor())
 		.onAppear {
 			syncSavedValues()

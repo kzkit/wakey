@@ -5,20 +5,39 @@
 //  Created by Claude on 11/10/2026.
 //
 
+import AppKit
 import SwiftUI
 
 // Liquid Glass helpers for macOS 26+. Every helper falls back to the look Wakey had before Liquid Glass,
-// so call sites stay free of availability checks and macOS 15 renders exactly as it did.
+// so call sites stay free of availability checks and macOS 15 renders exactly as it did. The exceptions are
+// `menuPanelWindowBackground` and `menuPanelBackground`, which give every supported macOS the same translucent menu material.
 
 extension View {
-	/// The background behind a whole window's content. On macOS 26+ the window, or the menu bar panel, already
-	/// draws the system background, and another material on top would flatten it.
+	/// The background behind the menu bar panel's content. On macOS 26+ the panel already draws the system
+	/// background, and another material on top would flatten it.
 	@ViewBuilder
 	func windowContentBackground() -> some View {
 		if #available(macOS 26.0, *) {
 			self
 		} else {
 			background(.regularMaterial)
+		}
+	}
+	
+	/// Fills a whole window with the translucent material of the menu bar panel, blurring the desktop behind it,
+	/// so a window opened from the menu matches it. Unlike the helpers around it, it looks the same before macOS 26.
+	func menuPanelWindowBackground() -> some View {
+		containerBackground(for: .window) {
+			MenuPanelMaterial()
+		}
+	}
+	
+	/// The same material for content hosted in a window AppKit created, where SwiftUI doesn't own the window
+	/// background. The window needs a full-size content view so the material also fills the title bar.
+	func menuPanelBackground() -> some View {
+		background {
+			MenuPanelMaterial()
+				.ignoresSafeArea()
 		}
 	}
 	
@@ -132,6 +151,20 @@ private struct ChipStyle: ViewModifier {
 		// The neutral pill is mid grey in light mode and light grey in dark mode, so dark text reads best on both.
 		return colorScheme == .dark ? Color(nsColor: .windowBackgroundColor) : .primary
 	}
+}
+
+/// The menu material blended with what's behind the window. It stays active while the window is in the background,
+/// like the menu bar panel, rather than turning opaque.
+private struct MenuPanelMaterial: NSViewRepresentable {
+	func makeNSView(context: Context) -> NSVisualEffectView {
+		let view = NSVisualEffectView()
+		view.material = .menu
+		view.blendingMode = .behindWindow
+		view.state = .active
+		return view
+	}
+	
+	func updateNSView(_ nsView: NSVisualEffectView, context: Context) {}
 }
 
 /// Neutral fills for highlights and grouped backgrounds. On macOS 26+ these are the system fill colors, which adapt
