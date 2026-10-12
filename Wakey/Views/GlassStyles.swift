@@ -31,7 +31,7 @@ extension View {
 			MenuPanelMaterial()
 		}
 	}
-
+	
 	/// The main action of a small button group: prominent glass on macOS 26+.
 	@ViewBuilder
 	func primaryActionButtonStyle() -> some View {
@@ -154,7 +154,7 @@ private struct MenuPanelMaterial: NSViewRepresentable {
 		view.state = .active
 		return view
 	}
-
+	
 	func updateNSView(_ nsView: NSVisualEffectView, context: Context) {}
 }
 
