@@ -13,8 +13,8 @@ import SwiftUI
 // `menuPanelWindowBackground` and `menuPanelBackground`, which give every supported macOS the same translucent menu material.
 
 extension View {
-	/// The background behind a whole window's content. On macOS 26+ the window, or the menu bar panel, already
-	/// draws the system background, and another material on top would flatten it.
+	/// The background behind the menu bar panel's content. On macOS 26+ the panel already draws the system
+	/// background, and another material on top would flatten it.
 	@ViewBuilder
 	func windowContentBackground() -> some View {
 		if #available(macOS 26.0, *) {
