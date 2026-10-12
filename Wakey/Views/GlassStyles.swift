@@ -5,6 +5,7 @@
 //  Created by Claude on 11/10/2026.
 //
 
+import AppKit
 import SwiftUI
 
 // Liquid Glass helpers for macOS 26+. Every helper falls back to the look Wakey had before Liquid Glass,
@@ -22,6 +23,14 @@ extension View {
 		}
 	}
 	
+	/// Fills a whole window with the translucent material of the menu bar panel, blurring the desktop behind it,
+	/// so a window opened from the menu matches it.
+	func menuPanelWindowBackground() -> some View {
+		containerBackground(for: .window) {
+			MenuPanelMaterial()
+		}
+	}
+
 	/// The main action of a small button group: prominent glass on macOS 26+.
 	@ViewBuilder
 	func primaryActionButtonStyle() -> some View {
@@ -132,6 +141,20 @@ private struct ChipStyle: ViewModifier {
 		// The neutral pill is mid grey in light mode and light grey in dark mode, so dark text reads best on both.
 		return colorScheme == .dark ? Color(nsColor: .windowBackgroundColor) : .primary
 	}
+}
+
+/// The menu material blended with what's behind the window. It stays active while the window is in the background,
+/// like the menu bar panel, rather than turning opaque.
+private struct MenuPanelMaterial: NSViewRepresentable {
+	func makeNSView(context: Context) -> NSVisualEffectView {
+		let view = NSVisualEffectView()
+		view.material = .menu
+		view.blendingMode = .behindWindow
+		view.state = .active
+		return view
+	}
+
+	func updateNSView(_ nsView: NSVisualEffectView, context: Context) {}
 }
 
 /// Neutral fills for highlights and grouped backgrounds. On macOS 26+ these are the system fill colors, which adapt
