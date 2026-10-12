@@ -9,7 +9,8 @@ import AppKit
 import SwiftUI
 
 // Liquid Glass helpers for macOS 26+. Every helper falls back to the look Wakey had before Liquid Glass,
-// so call sites stay free of availability checks and macOS 15 renders exactly as it did.
+// so call sites stay free of availability checks and macOS 15 renders exactly as it did. The one exception is
+// `menuPanelWindowBackground`, which gives every supported macOS the same translucent menu material.
 
 extension View {
 	/// The background behind a whole window's content. On macOS 26+ the window, or the menu bar panel, already
@@ -24,7 +25,7 @@ extension View {
 	}
 	
 	/// Fills a whole window with the translucent material of the menu bar panel, blurring the desktop behind it,
-	/// so a window opened from the menu matches it.
+	/// so a window opened from the menu matches it. Unlike the helpers around it, it looks the same before macOS 26.
 	func menuPanelWindowBackground() -> some View {
 		containerBackground(for: .window) {
 			MenuPanelMaterial()
