@@ -144,6 +144,13 @@ final class ScheduleTests: XCTestCase {
 		XCTAssertEqual(Schedule.minute(ofTimeOfDay: nextDay), 9 * 60 + 15)
 	}
 	
+	func testMinuteOfTimeOfDayWrapsBeforeMidnight() {
+		// Stepping down from 00:00 in the picker lands on the previous day.
+		let previousDay = Schedule.timeOfDayDate(forMinute: 0).addingTimeInterval(-60)
+		
+		XCTAssertEqual(Schedule.minute(ofTimeOfDay: previousDay), 23 * 60 + 59)
+	}
+	
 	func testOrderedWeekdaysStartsFromFirstWeekday() {
 		XCTAssertEqual(Schedule.orderedWeekdays(firstWeekday: 1), [1, 2, 3, 4, 5, 6, 7])
 		XCTAssertEqual(Schedule.orderedWeekdays(firstWeekday: 2), [2, 3, 4, 5, 6, 7, 1])

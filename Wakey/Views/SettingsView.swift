@@ -714,11 +714,14 @@ private struct TimeOfDayField: NSViewRepresentable {
 	}
 	
 	static func dismantleNSView(_ picker: TimeOfDayPicker, coordinator: Coordinator) {
-		coordinator.commitPendingChange(from: picker)
+		// Teardown happens during a view update, which mustn't change state, so save on the next turn.
+		DispatchQueue.main.async {
+			coordinator.commitPendingChange(from: picker)
+		}
 	}
 	
 	final class Coordinator: NSObject {
-		/// Long enough to type both digits of an hour or minute, so a half-typed time is never saved.
+		/// The picker reports the hour and the minute separately, so an hour and minute typed in a row are saved once.
 		private static let commitDelay: TimeInterval = 0.8
 		
 		var onChange: (Int) -> Void
@@ -756,6 +759,7 @@ private struct TimeOfDayField: NSViewRepresentable {
 private final class TimeOfDayPicker: NSDatePicker {
 	var onResignFirstResponder: (() -> Void)?
 	private var outsideClickMonitor: Any?
+	private var windowCloseObserver: NSObjectProtocol?
 	
 	/// Only reachable with Tab when Full Keyboard Access is on, like the switches around it. Otherwise AppKit would pick
 	/// it as the first field when Settings opens and a stray keypress would change the schedule.
@@ -784,6 +788,27 @@ private final class TimeOfDayPicker: NSDatePicker {
 		super.viewWillMove(toWindow: newWindow)
 		if newWindow == nil {
 			stopEndingEditingOnOutsideClicks()
+		}
+	}
+	
+	/// Closing a window doesn't take focus from its field, so a reopened Settings window would come back with the time
+	/// still being edited. End editing (and save) as the window closes instead.
+	override func viewDidMoveToWindow() {
+		super.viewDidMoveToWindow()
+		
+		if let windowCloseObserver {
+			NotificationCenter.default.removeObserver(windowCloseObserver)
+			self.windowCloseObserver = nil
+		}
+		guard let window else { return }
+		
+		windowCloseObserver = NotificationCenter.default.addObserver(
+			forName: NSWindow.willCloseNotification,
+			object: window,
+			queue: .main
+		) { [weak self] _ in
+			guard let self, let window = self.window, window.firstResponder === self else { return }
+			window.makeFirstResponder(nil)
 		}
 	}
 	
